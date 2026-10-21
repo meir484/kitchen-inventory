@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Package, AlertTriangle, CalendarClock, Plus, Minus, Search, Trash2, X,
   ShoppingCart, LayoutGrid, CheckCircle2, Circle, ChefHat, PackageCheck,
-  Cloud, CloudOff, Copy, Link2,
+  Cloud, CloudOff, Copy, Link2, Lock, LockOpen,
 } from 'lucide-react';
 import { CATEGORIES, UNITS, catLabel, seedItems } from './data.js';
-import { fetchKitchen, isValidCode, newKitchenCode, saveKitchen, watchKitchen } from './sync.js';
+import {
+  fetchKitchen, isValidCode, lockEditing, newKitchenCode, saveKitchen, unlockEditing, watchEditor, watchKitchen,
+} from './sync.js';
 
 const ITEMS_KEY = 'kitchen-inventory:items';
 const CHECKED_KEY = 'kitchen-inventory:checked';
@@ -270,6 +272,41 @@ function SyncModal({ code, status, onClose, onCreate, onJoin, onLeave }) {
   );
 }
 
+function UnlockModal({ onClose }) {
+  const [pw, setPw] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await unlockEditing(pw);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-xl font-extrabold"><Lock size={20} /> סיסמת עריכה</h2>
+          <button type="button" onClick={onClose} aria-label="סגור" className="rounded-full p-2 hover:bg-stone-100"><X size={20} /></button>
+        </div>
+        <p className="mb-3 text-sm text-stone-600">המלאי המשותף נעול לעריכה. הזן את הסיסמה כדי לשנות.</p>
+        <input autoFocus type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="סיסמה"
+          className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-200" />
+        {error && <p className="mt-3 rounded-xl bg-red-50 p-2 text-sm text-red-600">{error}</p>}
+        <button disabled={busy || !pw} className="mt-4 w-full rounded-xl bg-stone-900 py-3 font-bold text-white disabled:opacity-40">
+          {busy ? 'בודק…' : 'אפשר עריכה'}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function App() {
   const [items, setItems] = useState(() => load(ITEMS_KEY, seedItems()));
   const [checked, setChecked] = useState(() => load(CHECKED_KEY, []));
@@ -279,6 +316,8 @@ export default function App() {
   const [sort, setSort] = useState('name');
   const [showAdd, setShowAdd] = useState(false);
   const [showSync, setShowSync] = useState(false);
+  const [showUnlock, setShowUnlock] = useState(false);
+  const [isEditor, setIsEditor] = useState(false);
   const [code, setCode] = useState(() => load(CODE_KEY, ''));
   const [syncStatus, setSyncStatus] = useState('off');
   const lastRemote = useRef('');
@@ -291,6 +330,10 @@ export default function App() {
     try { localStorage.setItem(CHECKED_KEY, JSON.stringify(checked)); } catch { /* storage unavailable */ }
   }, [checked]);
 
+
+  useEffect(() => watchEditor(setIsEditor), []);
+  const readOnly = !!code && !isEditor;
+  const guard = (fn) => (...a) => (readOnly ? setShowUnlock(true) : fn(...a));
 
   const applyRemote = (data) => {
     const { items: ri, checked: rc } = JSON.parse(data.payload);
@@ -316,7 +359,7 @@ export default function App() {
   }, [code]);
 
   useEffect(() => {
-    if (!code || !writesReady.current) return undefined;
+    if (!code || !isEditor || !writesReady.current) return undefined;
     const payload = JSON.stringify({ items, checked });
     if (payload === lastRemote.current) return undefined;
     const t = setTimeout(() => {
@@ -324,7 +367,7 @@ export default function App() {
       saveKitchen(code, { payload }).then(() => setSyncStatus('ok')).catch(() => setSyncStatus('error'));
     }, 500);
     return () => clearTimeout(t);
-  }, [items, checked, code]);
+  }, [items, checked, code, isEditor]);
 
   const joinKitchen = async (raw) => {
     if (!isValidCode(raw)) throw new Error('הקוד אינו תקין');
@@ -334,6 +377,10 @@ export default function App() {
     setCode(raw);
   };
   const createKitchen = async () => {
+    if (!isEditor) {
+      setShowUnlock(true);
+      throw new Error('הזן את סיסמת העריכה ואז לחץ שוב');
+    }
     const fresh = newKitchenCode();
     const payload = JSON.stringify({ items, checked });
     await saveKitchen(fresh, { payload }).catch(() => { throw new Error('אין חיבור לשרת, נסה שוב'); });
@@ -351,12 +398,12 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const adjust = (id, delta) =>
-    setItems((p) => p.map((i) => (i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i)));
-  const remove = (id) => {
+  const adjust = guard((id, delta) =>
+    setItems((p) => p.map((i) => (i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i))));
+  const remove = guard((id) => {
     const it = items.find((i) => i.id === id);
     if (it && window.confirm(`למחוק את "${it.name}"?`)) setItems((p) => p.filter((i) => i.id !== id));
-  };
+  });
   const add = (data) => {
     setItems((p) => [...p, { ...data, id: Date.now() }]);
     setShowAdd(false);
@@ -380,11 +427,11 @@ export default function App() {
     return [...list].sort(sorters[sort]);
   }, [items, category, query, sort]);
 
-  const toggleCheck = (id) => setChecked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-  const restockChecked = () => {
+  const toggleCheck = guard((id) => setChecked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id])));
+  const restockChecked = guard(() => {
     setItems((p) => p.map((i) => (checked.includes(i.id) ? { ...i, quantity: Math.max(i.quantity, i.max) } : i)));
     setChecked([]);
-  };
+  });
   const shoppingChecked = lowItems.filter((i) => checked.includes(i.id));
 
   const tabBtn = (id, Icon, text, badge) => (
@@ -420,13 +467,26 @@ export default function App() {
           {syncStatus === 'off' ? 'סנכרון' : syncStatus === 'error' ? 'לא מחובר' : syncStatus === 'syncing' ? 'מסנכרן…' : 'מסונכרן'}
         </button>
         <button
-          onClick={() => setShowAdd(true)}
+          onClick={guard(() => setShowAdd(true))}
           className="flex items-center gap-2 rounded-xl bg-gradient-to-l from-orange-500 to-rose-500 px-5 py-3 font-bold text-white shadow-lg transition hover:scale-105"
         >
           <Plus size={20} /> פריט חדש
         </button>
         </div>
       </header>
+
+      {readOnly && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 p-4 text-amber-800 ring-1 ring-amber-200">
+          <span className="flex items-center gap-2"><Lock size={18} /> מצב צפייה בלבד. לעריכה יש להזין סיסמה.</span>
+          <button onClick={() => setShowUnlock(true)} className="rounded-xl bg-amber-500 px-4 py-2 font-bold text-white hover:bg-amber-600">הזן סיסמה</button>
+        </div>
+      )}
+      {code && isEditor && (
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-2xl bg-emerald-50 p-3 text-sm text-emerald-700">
+          <span className="flex items-center gap-2"><LockOpen size={16} /> מצב עריכה פעיל במכשיר זה</span>
+          <button onClick={() => lockEditing()} className="font-bold underline">נעל</button>
+        </div>
+      )}
 
       <section className="mb-8 grid gap-4 sm:grid-cols-3">
         <StatCard icon={Package} label="סה״כ פריטים" value={items.length} tone="bg-sky-100 text-sky-600" />
@@ -533,6 +593,7 @@ export default function App() {
         <SyncModal code={code} status={syncStatus} onClose={() => setShowSync(false)}
           onCreate={createKitchen} onJoin={joinKitchen} onLeave={() => setCode('')} />
       )}
+      {showUnlock && <UnlockModal onClose={() => setShowUnlock(false)} />}
       {showAdd && <AddModal onClose={() => setShowAdd(false)} onSave={add} />}
     </div>
   );

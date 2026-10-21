@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc, getFirestore, onSnapshot, setDoc } from 'firebase/firestore';
 
 // Public web identifiers; access is governed by the Firestore security rules.
@@ -36,3 +37,18 @@ export const watchKitchen = (code, onData, onError) =>
     },
     onError,
   );
+
+// One shared editor account; viewers need only the kitchen code, editors also need the password.
+export const EDITOR_EMAIL = 'editor@kitchen-inventory.app';
+const auth = getAuth(app);
+
+export const unlockEditing = async (password) => {
+  try {
+    await signInWithEmailAndPassword(auth, EDITOR_EMAIL, password);
+  } catch (e) {
+    const wrong = ['auth/invalid-credential', 'auth/wrong-password', 'auth/invalid-login-credentials', 'auth/user-not-found'];
+    throw new Error(wrong.includes(e.code) ? 'הסיסמה שגויה' : 'לא ניתן להתחבר כרגע, נסה שוב');
+  }
+};
+export const lockEditing = () => signOut(auth);
+export const watchEditor = (cb) => onAuthStateChanged(auth, (u) => cb(!!u));
