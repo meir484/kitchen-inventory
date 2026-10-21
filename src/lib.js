@@ -60,3 +60,31 @@ export const normalizeState = (s) => ({
   checked: Array.isArray(s?.checked) ? s.checked : [],
   orders: Array.isArray(s?.orders) ? s.orders : [],
 });
+
+const dayNum = (iso) => Math.round(Date.parse(`${iso}T00:00:00Z`) / 86400000);
+const addDays = (iso, n) => new Date((dayNum(iso) + n) * 86400000).toISOString().slice(0, 10);
+
+// Per-item ordering rhythm learned from the order log (items are matched by exact name).
+export function orderStats(orders) {
+  const byName = new Map();
+  orders.forEach((o) => {
+    if (!byName.has(o.name)) byName.set(o.name, { name: o.name, supplier: o.supplier, byDate: new Map() });
+    const e = byName.get(o.name);
+    e.supplier = o.supplier;
+    e.byDate.set(o.date, (e.byDate.get(o.date) || 0) + o.qty);
+  });
+  const out = new Map();
+  byName.forEach((e, name) => {
+    const dates = [...e.byDate.keys()].sort();
+    const qtys = dates.map((d) => e.byDate.get(d));
+    const gaps = dates.slice(1).map((d, k) => dayNum(d) - dayNum(dates[k]));
+    const avgInterval = gaps.length ? Math.round(gaps.reduce((s, g) => s + g, 0) / gaps.length) : null;
+    const last = dates[dates.length - 1];
+    out.set(name, {
+      name, supplier: e.supplier, count: dates.length, last, avgInterval,
+      avgQty: Math.round((qtys.reduce((s, q) => s + q, 0) / qtys.length) * 10) / 10,
+      next: avgInterval ? addDays(last, avgInterval) : null,
+    });
+  });
+  return out;
+}

@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { CATEGORIES, catLabel, seedItems, seedOrders } from './data.js';
 import {
-  daysUntil, EXPIRY_SOON_DAYS, load, money, needsOrder, normalizeState, qtyOf, save, STATUS, stockStatus, stockValue,
+  daysUntil, EXPIRY_SOON_DAYS, load, money, needsOrder, normalizeState, orderStats, qtyOf, save, STATUS, stockStatus, stockValue,
 } from './lib.js';
 import {
   fetchKitchen, isValidCode, lockEditing, newKitchenCode, saveKitchen, watchEditor, watchKitchen,
@@ -161,6 +161,7 @@ export default function App() {
     }
   });
 
+  const rhythms = useMemo(() => orderStats(orders), [orders]);
   const lowItems = useMemo(() => items.filter(needsOrder), [items]);
   const expiringCount = useMemo(
     () => items.filter((i) => { const d = daysUntil(i.expiry); return d !== null && d <= EXPIRY_SOON_DAYS; }).length,
@@ -208,7 +209,7 @@ export default function App() {
 
   const grid = (list) => (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {list.map((i) => <ItemCard key={i.id} item={i} onAdjust={adjust} onDelete={remove} />)}
+      {list.map((i) => <ItemCard key={i.id} item={i} rhythm={rhythms.get(i.name)} onAdjust={adjust} onDelete={remove} />)}
     </div>
   );
 

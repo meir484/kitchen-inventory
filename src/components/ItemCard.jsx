@@ -3,13 +3,13 @@ import { Plus, Minus, Trash2, CalendarClock, Truck } from 'lucide-react';
 import { catLabel } from '../data.js';
 import { STATUS, expiryInfo, formatDate, isCounted, money, qtyOf, stockStatus } from '../lib.js';
 
-export default function ItemCard({ item, onAdjust, onDelete }) {
+export default function ItemCard({ item, rhythm, onAdjust, onDelete }) {
   const status = stockStatus(item);
   const s = STATUS[status];
   const cat = catLabel(item.category);
   const exp = expiryInfo(item.expiry);
   const pct = Math.min(100, Math.max(status === 'out' || status === 'unknown' ? 0 : 4, (qtyOf(item) / (item.max || 1)) * 100));
-  const hasOrderInfo = item.supplier || item.price || item.lastOrderDate;
+  const hasOrderInfo = item.supplier || item.price || item.lastOrderDate || rhythm?.avgInterval;
 
   return (
     <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 transition hover:shadow-lg">
@@ -63,6 +63,7 @@ export default function ItemCard({ item, onAdjust, onDelete }) {
         <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-stone-100 pt-3 text-xs text-stone-500">
           {item.supplier && <span className="flex items-center gap-1"><Truck size={13} /> {item.supplier}</span>}
           {item.price ? <span>{money(item.price)} ליח׳</span> : null}
+          {rhythm?.avgInterval ? <span className="font-medium text-sky-600">מוזמן בערך כל {rhythm.avgInterval} ימים</span> : null}
           {item.lastOrderDate && <span>הזמנה אחרונה: {formatDate(item.lastOrderDate)}{item.lastOrderQty ? ` (${item.lastOrderQty})` : ''}</span>}
         </div>
       )}

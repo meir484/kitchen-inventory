@@ -1,11 +1,60 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, History, Search, Trash2 } from 'lucide-react';
-import { formatDate, money } from '../lib.js';
+import { daysUntil, formatDate, money, orderStats } from '../lib.js';
+
+function FrequencyTable({ stats, supplier, query }) {
+  const q = query.trim();
+  const rows = stats
+    .filter((r) => (supplier === 'all' || r.supplier === supplier) && (!q || r.name.includes(q)))
+    .sort((a, b) => (a.next ? 0 : 1) - (b.next ? 0 : 1) || (a.next || '').localeCompare(b.next || '') || b.count - a.count);
+  const learned = rows.filter((r) => r.avgInterval).length;
+  return (
+    <>
+      <p className="mb-3 rounded-xl bg-sky-50 p-3 text-sm text-sky-800">
+        הקצב מחושב מהמרווח הממוצע בין הזמנות של אותו פריט. כרגע אפשר ללמוד קצב על {learned} פריטים (אלה שהוזמנו לפחות פעמיים).
+        ככל שיישמרו עוד הזמנות, החישוב יהיה מדויק יותר.
+      </p>
+      <div className="overflow-x-auto rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead className="bg-stone-50 text-stone-500">
+            <tr>
+              <th className="p-3 text-right font-medium">פריט</th>
+              <th className="p-3 font-medium">הוזמן (פעמים)</th>
+              <th className="p-3 font-medium">הזמנה אחרונה</th>
+              <th className="p-3 font-medium">בערך כל</th>
+              <th className="p-3 font-medium">צפי הזמנה הבאה</th>
+              <th className="p-3 font-medium">כמות ממוצעת</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const d = r.next ? daysUntil(r.next) : null;
+              return (
+                <tr key={r.name} className="border-t border-stone-50">
+                  <td className="p-3 text-right"><div className="font-medium">{r.name}</div><div className="text-xs text-stone-400">{r.supplier}</div></td>
+                  <td className="p-3 text-center">{r.count}</td>
+                  <td className="p-3 text-center">{formatDate(r.last)}</td>
+                  <td className="p-3 text-center">{r.avgInterval ? `${r.avgInterval} ימים` : <span className="text-stone-400">אין מספיק נתונים</span>}</td>
+                  <td className={`p-3 text-center ${d !== null && d <= 0 ? 'font-bold text-amber-600' : ''}`}>
+                    {r.next ? `${formatDate(r.next)}${d <= 0 ? ' (הגיע הזמן)' : ''}` : '—'}
+                  </td>
+                  <td className="p-3 text-center">{r.avgQty}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
 
 export default function OrdersHistory({ orders, onDeleteOrder }) {
   const [supplier, setSupplier] = useState('all');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState([]);
+  const [mode, setMode] = useState('orders');
+  const stats = useMemo(() => [...orderStats(orders).values()], [orders]);
 
   const suppliers = useMemo(() => [...new Set(orders.map((o) => o.supplier))].sort((a, b) => a.localeCompare(b, 'he')), [orders]);
 
@@ -29,6 +78,12 @@ export default function OrdersHistory({ orders, onDeleteOrder }) {
 
   return (
     <section>
+      <div className="mb-4 flex w-fit overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5">
+        {[['orders', 'לפי הזמנות'], ['freq', 'תכיפות לפי פריט']].map(([id, text]) => (
+          <button key={id} onClick={() => setMode(id)} className={`px-5 py-2.5 text-sm font-medium transition ${mode === id ? 'bg-stone-900 text-white' : 'hover:bg-stone-50'}`}>{text}</button>
+        ))}
+      </div>
+
       <div className="mb-4 grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-black/5">
           <div className="text-sm text-stone-500">הזמנות</div>
@@ -53,7 +108,9 @@ export default function OrdersHistory({ orders, onDeleteOrder }) {
         </select>
       </div>
 
-      {groups.length === 0 ? (
+      {mode === 'freq' ? (
+        <FrequencyTable stats={stats} supplier={supplier} query={query} />
+      ) : groups.length === 0 ? (
         <div className="rounded-2xl bg-white/70 py-16 text-center text-stone-500">
           <History size={48} className="mx-auto mb-3 text-stone-300" />
           אין הזמנות להצגה
