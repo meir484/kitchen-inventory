@@ -1,9 +1,9 @@
 import React from 'react';
-import { Plus, Minus, Trash2, CalendarClock, Truck, Bell, BellOff } from 'lucide-react';
+import { Plus, Minus, Trash2, CalendarClock, Truck, Bell, BellOff, Pencil } from 'lucide-react';
 import { catLabel } from '../data.js';
 import { STATUS, expiryInfo, formatDate, isCounted, money, qtyOf, stockStatus } from '../lib.js';
 
-export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMute }) {
+export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMute, onSetQty, onRename }) {
   const status = stockStatus(item);
   const s = STATUS[status];
   const cat = catLabel(item.category);
@@ -20,6 +20,17 @@ export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMut
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <span className={`rounded-full px-3 py-1 text-xs font-bold ${s.badge}`}>{s.label}</span>
+          <button
+            onClick={() => {
+              const v = window.prompt('שם חדש לפריט:', item.name);
+              if (v !== null && v.trim() && v.trim() !== item.name) onRename(item.id, v.trim());
+            }}
+            aria-label={`ערוך שם ל${item.name}`}
+            title="עריכת שם"
+            className="rounded-full p-1.5 text-stone-300 transition hover:bg-stone-100 hover:text-stone-600"
+          >
+            <Pencil size={16} />
+          </button>
           <button
             onClick={() => onToggleMute(item.id)}
             aria-label={item.muted ? `החזר התראות ל${item.name}` : `השתק התראות ל${item.name}`}
@@ -51,10 +62,19 @@ export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMut
           >
             <Plus size={20} />
           </button>
-          <div className="min-w-[4.5rem] text-center">
+          <button
+            onClick={() => {
+              const v = window.prompt(`כמות חדשה ל"${item.name}":`, isCounted(item) ? String(item.quantity) : '');
+              const n = v === null || v.trim() === '' ? NaN : Number(v.replace(',', '.'));
+              if (Number.isFinite(n) && n >= 0) onSetQty(item.id, n);
+            }}
+            title="לחץ להזנת כמות ידנית"
+            aria-label={`ערוך כמות ל${item.name}`}
+            className="min-w-[4.5rem] rounded-lg py-1 text-center transition hover:bg-stone-100"
+          >
             <div className="text-2xl font-extrabold leading-none">{isCounted(item) ? item.quantity : '—'}</div>
             <div className="text-xs text-stone-500">{item.unit}</div>
-          </div>
+          </button>
           <button
             onClick={() => onAdjust(item.id, -1)}
             disabled={qtyOf(item) <= 0}

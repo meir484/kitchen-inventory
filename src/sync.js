@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc, getFirestore, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, getDoc, initializeFirestore, onSnapshot, setDoc } from 'firebase/firestore';
 
 // Public web identifiers; access is governed by the Firestore security rules.
 const app = initializeApp({
@@ -11,7 +11,8 @@ const app = initializeApp({
   messagingSenderId: '413846928233',
   appId: '1:413846928233:web:4b8d92ec1a555db0c15bf8',
 });
-const db = getFirestore(app);
+// Some networks and filters break Firestore's streaming channel; fall back to long polling there.
+const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
 
 const ref = (code) => doc(db, 'kitchens', code);
 
@@ -26,6 +27,9 @@ export const fetchKitchen = async (code) => {
   const snap = await getDoc(ref(code));
   return snap.exists() ? snap.data() : null;
 };
+
+export const withTimeout = (promise, ms, message) =>
+  Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))]);
 
 export const saveKitchen = (code, data) => setDoc(ref(code), { ...data, updatedAt: Date.now() });
 

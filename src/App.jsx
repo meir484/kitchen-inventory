@@ -8,8 +8,9 @@ import {
   daysUntil, EXPIRY_SOON_DAYS, load, money, needsOrder, normalizeState, orderStats, qtyOf, save, STATUS, stockStatus, stockValue,
 } from './lib.js';
 import {
-  fetchKitchen, isValidCode, lockEditing, newKitchenCode, saveKitchen, watchEditor, watchKitchen,
+  fetchKitchen, isValidCode, lockEditing, newKitchenCode, saveKitchen, watchEditor, watchKitchen, withTimeout,
 } from './sync.js';
+import { runMigrations } from './migrations.js';
 import ItemCard from './components/ItemCard.jsx';
 import AddModal from './components/AddModal.jsx';
 import SyncModal from './components/SyncModal.jsx';
@@ -19,6 +20,7 @@ import OrdersHistory from './components/OrdersHistory.jsx';
 
 const ITEMS_KEY = 'kitchen-inventory:v2:items';
 const ORDERS_KEY = 'kitchen-inventory:v2:orders';
+const APPLIED_KEY = 'kitchen-inventory:v2:applied';
 const REMOVED_KEY = 'kitchen-inventory:v2:removedOrders';
 const CHECKED_KEY = 'kitchen-inventory:v2:checked';
 const VIEW_KEY = 'kitchen-inventory:v2:view';
@@ -39,7 +41,9 @@ function StatCard({ icon: Icon, label, value, tone }) {
 }
 
 export default function App() {
-  const [items, setItems] = useState(() => load(ITEMS_KEY, seedItems()));
+  const [boot] = useState(() => runMigrations(load(ITEMS_KEY, seedItems()), load(APPLIED_KEY, [])));
+  const [items, setItems] = useState(boot.items);
+  const [applied, setApplied] = useState(boot.applied);
   const [removedOrders, setRemovedOrders] = useState(() => load(REMOVED_KEY, []));
   const [orders, setOrders] = useState(() => mergeSeedOrders(load(ORDERS_KEY, seedOrders()), load(REMOVED_KEY, [])));
   const [checked, setChecked] = useState(() => load(CHECKED_KEY, []));
@@ -64,6 +68,7 @@ export default function App() {
   useEffect(() => save(ORDERS_KEY, orders), [orders]);
   useEffect(() => save(CHECKED_KEY, checked), [checked]);
   useEffect(() => save(REMOVED_KEY, removedOrders), [removedOrders]);
+  useEffect(() => save(APPLIED_KEY, applied), [applied]);
   useEffect(() => save(VIEW_KEY, view), [view]);
 
   useEffect(() => watchEditor(setIsEditor), []);
@@ -73,7 +78,9 @@ export default function App() {
   const applyRemote = (data) => {
     const next = normalizeState(JSON.parse(data.payload));
     lastRemote.current = data.payload;
-    setItems(next.items);
+    const migrated = runMigrations(next.items, next.appliedMigrations);
+    setItems(migrated.items);
+    setApplied(migrated.applied);
     setChecked(next.checked);
     setOrders(mergeSeedOrders(next.orders, next.removedOrders));
     setRemovedOrders(next.removedOrders);
@@ -97,14 +104,14 @@ export default function App() {
 
   useEffect(() => {
     if (!code || !isEditor || !writesReady.current) return undefined;
-    const payload = JSON.stringify({ items, checked, orders, removedOrders });
+    const payload = JSON.stringify({ items, checked, orders, removedOrders, appliedMigrations: applied });
     if (payload === lastRemote.current) return undefined;
     const t = setTimeout(() => {
       lastRemote.current = payload;
       saveKitchen(code, { payload }).then(() => setSyncStatus('ok')).catch(() => setSyncStatus('error'));
     }, 500);
     return () => clearTimeout(t);
-  }, [items, checked, orders, removedOrders, code, isEditor]);
+  }, [items, checked, orders, removedOrders, applied, code, isEditor]);
 
   const joinKitchen = async (raw) => {
     if (!isValidCode(raw)) throw new Error('הקוד אינו תקין');
@@ -119,8 +126,11 @@ export default function App() {
       throw new Error('הזן את סיסמת העריכה ואז לחץ שוב');
     }
     const fresh = newKitchenCode();
-    const payload = JSON.stringify({ items, checked, orders, removedOrders });
-    await saveKitchen(fresh, { payload }).catch(() => { throw new Error('אין חיבור לשרת, נסה שוב'); });
+    const payload = JSON.stringify({ items, checked, orders, removedOrders, appliedMigrations: applied });
+    await withTimeout(saveKitchen(fresh, { payload }), 15000, 'השרת לא הגיב. בדוק חיבור לאינטרנט (חלק מהסינונים חוסמים את השירות) ונסה שוב')
+      .catch((e) => {
+        throw new Error(e.code === 'permission-denied' ? 'אין הרשאה לשמור. הזן שוב את סיסמת העריכה' : e.message || 'אין חיבור לשרת, נסה שוב');
+      });
     lastRemote.current = payload;
     setCode(fresh);
   };
@@ -137,6 +147,8 @@ export default function App() {
 
   const adjust = guard((id, delta) =>
     setItems((p) => p.map((i) => (i.id === id ? { ...i, quantity: Math.max(0, qtyOf(i) + delta) } : i))));
+  const setQty = guard((id, value) => setItems((p) => p.map((i) => (i.id === id ? { ...i, quantity: value, max: Math.max(i.max || 1, value) } : i))));
+  const rename = guard((id, name) => setItems((p) => p.map((i) => (i.id === id ? { ...i, name } : i))));
   const remove = guard((id) => {
     const it = items.find((i) => i.id === id);
     if (it && window.confirm(`למחוק את "${it.name}"?`)) setItems((p) => p.filter((i) => i.id !== id));
@@ -164,7 +176,9 @@ export default function App() {
   });
   const resetToFile = guard(() => {
     if (window.confirm('לטעון מחדש את המלאי והיסטוריית ההזמנות מקובץ ההתחלה? כל השינויים הנוכחיים יימחקו.')) {
-      setItems(seedItems());
+      const fresh = runMigrations(seedItems(), []);
+      setItems(fresh.items);
+      setApplied(fresh.applied);
       setOrders(seedOrders());
       setRemovedOrders([]);
       setChecked([]);
@@ -219,7 +233,7 @@ export default function App() {
 
   const grid = (list) => (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {list.map((i) => <ItemCard key={i.id} item={i} rhythm={rhythms.get(i.name)} onAdjust={adjust} onDelete={remove} onToggleMute={toggleMute} />)}
+      {list.map((i) => <ItemCard key={i.id} item={i} rhythm={rhythms.get(i.name)} onAdjust={adjust} onDelete={remove} onToggleMute={toggleMute} onSetQty={setQty} onRename={rename} />)}
     </div>
   );
 
