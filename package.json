@@ -1,0 +1,23 @@
+{
+  "name": "kitchen-inventory",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "lucide-react": "*",
+    "react": "*",
+    "react-dom": "*"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "*",
+    "autoprefixer": "*",
+    "postcss": "*",
+    "tailwindcss": "^3",
+    "vite": "*"
+  }
+}
