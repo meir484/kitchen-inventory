@@ -32,14 +32,14 @@ export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMut
             onClick={() => onToggleMute(item.id)}
             aria-label={item.muted ? `החזר התראות ל${item.name}` : `השתק התראות ל${item.name}`}
             title={item.muted ? 'מושתק – לא יופיע כחסר. לחץ להחזרת התראות' : 'השתק: אל תציג כחסר'}
-            className={`rounded-full p-1.5 transition ${item.muted ? 'bg-amber-100 text-amber-600' : 'text-stone-300 hover:bg-stone-100 hover:text-stone-600'}`}
+            className={`rounded-full p-2.5 transition sm:p-1.5 ${item.muted ? 'bg-amber-100 text-amber-600' : 'text-stone-300 hover:bg-stone-100 hover:text-stone-600'}`}
           >
             {item.muted ? <BellOff size={16} /> : <Bell size={16} />}
           </button>
           <button
             onClick={() => onDelete(item.id)}
             aria-label={`מחק ${item.name}`}
-            className="rounded-full p-1.5 text-stone-300 transition hover:bg-red-50 hover:text-red-500"
+            className="rounded-full p-2.5 text-stone-300 transition hover:bg-red-50 hover:text-red-500 sm:p-1.5"
           >
             <Trash2 size={16} />
           </button>

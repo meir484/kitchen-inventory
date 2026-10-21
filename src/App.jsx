@@ -29,13 +29,13 @@ const CODE_KEY = 'kitchen-inventory:code';
 
 function StatCard({ icon: Icon, label, value, tone }) {
   return (
-    <div className="flex items-center gap-4 rounded-2xl bg-white/80 p-5 shadow-sm ring-1 ring-black/5 backdrop-blur">
-      <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${tone}`}>
+    <div className="flex items-center gap-3 rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-black/5 backdrop-blur sm:gap-4 sm:p-5">
+      <div className={`hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl sm:flex ${tone}`}>
         <Icon size={24} />
       </div>
       <div>
-        <div className="text-3xl font-extrabold leading-none">{value}</div>
-        <div className="mt-1 text-sm text-stone-500">{label}</div>
+        <div className="text-2xl font-extrabold leading-none sm:text-3xl">{value}</div>
+        <div className="mt-1 text-xs text-stone-500 sm:text-sm">{label}</div>
       </div>
     </div>
   );
@@ -287,7 +287,7 @@ export default function App() {
         </div>
       )}
 
-      <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard icon={Package} label="סה״כ פריטים" value={items.length} tone="bg-sky-100 text-sky-600" />
         <StatCard icon={AlertTriangle} label="לחידוש (מתחת למינימום)" value={lowItems.length} tone="bg-amber-100 text-amber-600" />
         <StatCard icon={CalendarClock} label="עומדים לפוג / פגו תוקף" value={expiringCount} tone="bg-red-100 text-red-600" />

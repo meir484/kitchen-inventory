@@ -117,7 +117,7 @@ export default function OrderModal({ items, onClose, onSaveOrder }) {
             <button disabled={!lines.length} onClick={print} className={`${btn} bg-stone-100 hover:bg-stone-200`}><Printer size={16} />הדפס</button>
           </div>
           <div className="flex gap-2">
-            <input value={invoice} onChange={(e) => setInvoice(e.target.value)} placeholder="מס׳ חשבונית (אופציונלי)"
+            <input value={invoice} onChange={(e) => setInvoice(e.target.value)} placeholder="מס׳ חשבונית"
               className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 outline-none focus:border-orange-400" />
             <button disabled={!lines.length} onClick={saveOrder} className={`${btn} bg-gradient-to-l from-orange-500 to-rose-500 text-white`}>
               <ClipboardCheck size={16} /> שמור בהיסטוריה
