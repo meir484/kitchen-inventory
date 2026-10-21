@@ -3,7 +3,7 @@ import { Plus, Minus, Trash2, CalendarClock, Truck, Bell, BellOff, Pencil } from
 import { catLabel } from '../data.js';
 import { STATUS, expiryInfo, formatDate, isCounted, money, qtyOf, stockStatus } from '../lib.js';
 
-export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMute, onSetQty, onRename }) {
+export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMute, onSetQty, onRename, onSetMin }) {
   const status = stockStatus(item);
   const s = STATUS[status];
   const cat = catLabel(item.category);
@@ -84,7 +84,18 @@ export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMut
             <Minus size={20} />
           </button>
         </div>
-        <div className="text-left text-xs text-stone-400">מינימום: {item.lowThreshold}</div>
+        <button
+          onClick={() => {
+            const v = window.prompt(`מלאי מינימלי ל"${item.name}" (התראה כשהכמות מתחת לערך הזה):`, String(item.lowThreshold));
+            const n = v === null || v.trim() === '' ? NaN : Number(v.replace(',', '.'));
+            if (Number.isFinite(n) && n >= 0) onSetMin(item.id, n);
+          }}
+          title="לחץ לעריכת המינימום"
+          aria-label={`ערוך מינימום ל${item.name}`}
+          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-stone-500 transition hover:bg-stone-100"
+        >
+          מינימום: {item.lowThreshold} <Pencil size={11} />
+        </button>
       </div>
 
       {hasOrderInfo && (

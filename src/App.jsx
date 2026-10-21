@@ -149,6 +149,7 @@ export default function App() {
     setItems((p) => p.map((i) => (i.id === id ? { ...i, quantity: Math.max(0, qtyOf(i) + delta) } : i))));
   const setQty = guard((id, value) => setItems((p) => p.map((i) => (i.id === id ? { ...i, quantity: value, max: Math.max(i.max || 1, value) } : i))));
   const rename = guard((id, name) => setItems((p) => p.map((i) => (i.id === id ? { ...i, name } : i))));
+  const setMin = guard((id, value) => setItems((p) => p.map((i) => (i.id === id ? { ...i, lowThreshold: value, max: Math.max(i.max || 1, value * 2) } : i))));
   const remove = guard((id) => {
     const it = items.find((i) => i.id === id);
     if (it && window.confirm(`למחוק את "${it.name}"?`)) setItems((p) => p.filter((i) => i.id !== id));
@@ -233,7 +234,7 @@ export default function App() {
 
   const grid = (list) => (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {list.map((i) => <ItemCard key={i.id} item={i} rhythm={rhythms.get(i.name)} onAdjust={adjust} onDelete={remove} onToggleMute={toggleMute} onSetQty={setQty} onRename={rename} />)}
+      {list.map((i) => <ItemCard key={i.id} item={i} rhythm={rhythms.get(i.name)} onAdjust={adjust} onDelete={remove} onToggleMute={toggleMute} onSetQty={setQty} onRename={rename} onSetMin={setMin} />)}
     </div>
   );
 
