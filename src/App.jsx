@@ -1,12 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Package, AlertTriangle, CalendarClock, Plus, Minus, Search, Trash2, X,
   ShoppingCart, LayoutGrid, CheckCircle2, Circle, ChefHat, PackageCheck,
+  Cloud, CloudOff, Copy, Link2,
 } from 'lucide-react';
 import { CATEGORIES, UNITS, catLabel, seedItems } from './data.js';
+import { fetchKitchen, isValidCode, newKitchenCode, saveKitchen, watchKitchen } from './sync.js';
 
 const ITEMS_KEY = 'kitchen-inventory:items';
 const CHECKED_KEY = 'kitchen-inventory:checked';
+const CODE_KEY = 'kitchen-inventory:code';
 const EXPIRY_SOON_DAYS = 3;
 
 const load = (key, fallback) => {
@@ -195,6 +198,78 @@ function AddModal({ onClose, onSave }) {
   );
 }
 
+
+function SyncModal({ code, status, onClose, onCreate, onJoin, onLeave }) {
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState('');
+  const link = code ? `${location.origin}${location.pathname}#k=${code}` : '';
+
+  const run = async (fn) => {
+    setBusy(true);
+    setError('');
+    try {
+      await fn();
+    } catch (e) {
+      setError(e.message || 'משהו השתבש, נסה שוב');
+    }
+    setBusy(false);
+  };
+  const copy = async (text, which) => {
+    try { await navigator.clipboard.writeText(text); setCopied(which); setTimeout(() => setCopied(''), 1500); } catch { /* clipboard unavailable */ }
+  };
+  const btn = 'rounded-xl px-4 py-2.5 font-bold transition disabled:opacity-40';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-xl font-extrabold"><Cloud size={22} /> סנכרון בין מכשירים</h2>
+          <button onClick={onClose} aria-label="סגור" className="rounded-full p-2 hover:bg-stone-100"><X size={20} /></button>
+        </div>
+
+        {code ? (
+          <>
+            <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-emerald-700">
+              {status === 'error' ? 'אין חיבור כרגע. השינויים יסונכרנו כשהחיבור יחזור.' : 'המלאי מסונכרן. כל שינוי יופיע בכל המכשירים המחוברים.'}
+            </p>
+            <label className="mb-1 block text-sm font-medium text-stone-600">קישור לחיבור מכשיר נוסף</label>
+            <div className="mb-3 flex gap-2">
+              <input readOnly value={link} dir="ltr" className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm" />
+              <button onClick={() => copy(link, 'link')} className={`${btn} flex items-center gap-1 bg-stone-900 text-white`}><Link2 size={16} />{copied === 'link' ? 'הועתק' : 'העתק'}</button>
+            </div>
+            <label className="mb-1 block text-sm font-medium text-stone-600">קוד המטבח</label>
+            <div className="mb-3 flex gap-2">
+              <input readOnly value={code} dir="ltr" className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm" />
+              <button onClick={() => copy(code, 'code')} className={`${btn} flex items-center gap-1 bg-stone-100 hover:bg-stone-200`}><Copy size={16} />{copied === 'code' ? 'הועתק' : 'העתק'}</button>
+            </div>
+            <p className="mb-5 text-xs text-stone-500">מי שמחזיק בקישור או בקוד יכול לראות ולערוך את המלאי. שתף רק עם בני הבית.</p>
+            <button onClick={() => { onLeave(); onClose(); }} className={`${btn} flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-100`}>
+              <CloudOff size={16} /> נתק מכשיר זה מהסנכרון
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="mb-4 text-stone-600">שמור את המלאי בענן כדי שיהיה זמין בכל מכשיר ובין בני הבית.</p>
+            <button disabled={busy} onClick={() => run(onCreate)} className={`${btn} mb-5 w-full bg-gradient-to-l from-orange-500 to-rose-500 py-3 text-white shadow`}>
+              {busy ? 'מתחבר…' : 'צור מטבח משותף מהמלאי הנוכחי'}
+            </button>
+            <div className="mb-2 text-sm font-medium text-stone-600">כבר יש לך קוד ממכשיר אחר?</div>
+            <div className="flex gap-2">
+              <input value={input} onChange={(e) => setInput(e.target.value.trim())} dir="ltr" placeholder="הדבק כאן קוד מטבח"
+                className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 outline-none focus:border-orange-400" />
+              <button disabled={busy || !input} onClick={() => run(() => onJoin(input))} className={`${btn} bg-stone-900 text-white`}>התחבר</button>
+            </div>
+            <p className="mt-2 text-xs text-stone-500">ההתחברות מחליפה את המלאי במכשיר זה במלאי המשותף.</p>
+          </>
+        )}
+        {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-red-600">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [items, setItems] = useState(() => load(ITEMS_KEY, seedItems()));
   const [checked, setChecked] = useState(() => load(CHECKED_KEY, []));
@@ -203,6 +278,11 @@ export default function App() {
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('name');
   const [showAdd, setShowAdd] = useState(false);
+  const [showSync, setShowSync] = useState(false);
+  const [code, setCode] = useState(() => load(CODE_KEY, ''));
+  const [syncStatus, setSyncStatus] = useState('off');
+  const lastRemote = useRef('');
+  const writesReady = useRef(false);
 
   useEffect(() => {
     try { localStorage.setItem(ITEMS_KEY, JSON.stringify(items)); } catch { /* storage unavailable */ }
@@ -210,6 +290,66 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem(CHECKED_KEY, JSON.stringify(checked)); } catch { /* storage unavailable */ }
   }, [checked]);
+
+
+  const applyRemote = (data) => {
+    const { items: ri, checked: rc } = JSON.parse(data.payload);
+    lastRemote.current = data.payload;
+    setItems(ri);
+    setChecked(rc);
+  };
+
+  useEffect(() => {
+    try { localStorage.setItem(CODE_KEY, JSON.stringify(code)); } catch { /* storage unavailable */ }
+    writesReady.current = false;
+    if (!code) { setSyncStatus('off'); return undefined; }
+    setSyncStatus('syncing');
+    return watchKitchen(
+      code,
+      (data) => {
+        if (data && data.payload !== lastRemote.current) applyRemote(data);
+        writesReady.current = true;
+        setSyncStatus('ok');
+      },
+      () => setSyncStatus('error'),
+    );
+  }, [code]);
+
+  useEffect(() => {
+    if (!code || !writesReady.current) return undefined;
+    const payload = JSON.stringify({ items, checked });
+    if (payload === lastRemote.current) return undefined;
+    const t = setTimeout(() => {
+      lastRemote.current = payload;
+      saveKitchen(code, { payload }).then(() => setSyncStatus('ok')).catch(() => setSyncStatus('error'));
+    }, 500);
+    return () => clearTimeout(t);
+  }, [items, checked, code]);
+
+  const joinKitchen = async (raw) => {
+    if (!isValidCode(raw)) throw new Error('הקוד אינו תקין');
+    const data = await fetchKitchen(raw).catch(() => { throw new Error('אין חיבור לשרת, נסה שוב'); });
+    if (!data) throw new Error('לא נמצא מטבח עם הקוד הזה');
+    applyRemote(data);
+    setCode(raw);
+  };
+  const createKitchen = async () => {
+    const fresh = newKitchenCode();
+    const payload = JSON.stringify({ items, checked });
+    await saveKitchen(fresh, { payload }).catch(() => { throw new Error('אין חיבור לשרת, נסה שוב'); });
+    lastRemote.current = payload;
+    setCode(fresh);
+  };
+
+  useEffect(() => {
+    const m = location.hash.match(/^#k=([\w-]+)$/);
+    if (!m || m[1] === code) return;
+    history.replaceState(null, '', location.pathname + location.search);
+    if (window.confirm('להתחבר למטבח המשותף? המלאי במכשיר זה יוחלף במלאי המשותף.')) {
+      joinKitchen(m[1]).catch((e) => window.alert(e.message));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const adjust = (id, delta) =>
     setItems((p) => p.map((i) => (i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i)));
@@ -271,12 +411,21 @@ export default function App() {
             <p className="text-stone-500">כל מה שיש במטבח, במבט אחד</p>
           </div>
         </div>
+        <div className="flex items-center gap-3">
+        <button
+          onClick={() => setShowSync(true)}
+          className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 font-bold shadow-sm ring-1 ring-black/5 transition hover:bg-stone-50"
+        >
+          {syncStatus === 'off' ? <CloudOff size={20} className="text-stone-400" /> : <Cloud size={20} className={syncStatus === 'error' ? 'text-red-500' : syncStatus === 'syncing' ? 'text-amber-500' : 'text-emerald-500'} />}
+          {syncStatus === 'off' ? 'סנכרון' : syncStatus === 'error' ? 'לא מחובר' : syncStatus === 'syncing' ? 'מסנכרן…' : 'מסונכרן'}
+        </button>
         <button
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 rounded-xl bg-gradient-to-l from-orange-500 to-rose-500 px-5 py-3 font-bold text-white shadow-lg transition hover:scale-105"
         >
           <Plus size={20} /> פריט חדש
         </button>
+        </div>
       </header>
 
       <section className="mb-8 grid gap-4 sm:grid-cols-3">
@@ -380,6 +529,10 @@ export default function App() {
         </section>
       )}
 
+      {showSync && (
+        <SyncModal code={code} status={syncStatus} onClose={() => setShowSync(false)}
+          onCreate={createKitchen} onJoin={joinKitchen} onLeave={() => setCode('')} />
+      )}
       {showAdd && <AddModal onClose={() => setShowAdd(false)} onSave={add} />}
     </div>
   );
