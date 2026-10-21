@@ -12,6 +12,7 @@ import {
 } from './sync.js';
 import { runMigrations } from './migrations.js';
 import ItemCard from './components/ItemCard.jsx';
+import EditModal from './components/EditModal.jsx';
 import AddModal from './components/AddModal.jsx';
 import SyncModal from './components/SyncModal.jsx';
 import UnlockModal from './components/UnlockModal.jsx';
@@ -55,6 +56,7 @@ export default function App() {
   const [view, setView] = useState(() => load(VIEW_KEY, 'grouped'));
   const [openGroups, setOpenGroups] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [showSync, setShowSync] = useState(false);
   const [showUnlock, setShowUnlock] = useState(false);
   const [showOrder, setShowOrder] = useState(false);
@@ -148,7 +150,10 @@ export default function App() {
   const adjust = guard((id, delta) =>
     setItems((p) => p.map((i) => (i.id === id ? { ...i, quantity: Math.max(0, qtyOf(i) + delta) } : i))));
   const setQty = guard((id, value) => setItems((p) => p.map((i) => (i.id === id ? { ...i, quantity: value, max: Math.max(i.max || 1, value) } : i))));
-  const rename = guard((id, name) => setItems((p) => p.map((i) => (i.id === id ? { ...i, name } : i))));
+  const updateItem = guard((id, patch) => {
+    setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+    setEditingId(null);
+  });
   const setMin = guard((id, value) => setItems((p) => p.map((i) => (i.id === id ? { ...i, lowThreshold: value, max: Math.max(i.max || 1, value * 2) } : i))));
   const remove = guard((id) => {
     const it = items.find((i) => i.id === id);
@@ -234,7 +239,7 @@ export default function App() {
 
   const grid = (list) => (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {list.map((i) => <ItemCard key={i.id} item={i} rhythm={rhythms.get(i.name)} onAdjust={adjust} onDelete={remove} onToggleMute={toggleMute} onSetQty={setQty} onRename={rename} onSetMin={setMin} />)}
+      {list.map((i) => <ItemCard key={i.id} item={i} rhythm={rhythms.get(i.name)} onAdjust={adjust} onDelete={remove} onToggleMute={toggleMute} onSetQty={setQty} onEdit={(id) => (readOnly ? setShowUnlock(true) : setEditingId(id))} onSetMin={setMin} />)}
     </div>
   );
 
@@ -445,6 +450,15 @@ export default function App() {
       )}
       {showUnlock && <UnlockModal onClose={() => setShowUnlock(false)} />}
       {showOrder && <OrderModal items={lowItems} onClose={() => setShowOrder(false)} onSaveOrder={saveOrder} />}
+      {editingId && items.find((i) => i.id === editingId) && (
+        <EditModal
+          item={items.find((i) => i.id === editingId)}
+          suppliers={[...new Set(items.map((i) => i.supplier).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'he'))}
+          onClose={() => setEditingId(null)}
+          onSave={updateItem}
+          onDelete={(id) => { setEditingId(null); remove(id); }}
+        />
+      )}
       {showAdd && <AddModal onClose={() => setShowAdd(false)} onSave={add} />}
     </div>
   );

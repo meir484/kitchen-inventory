@@ -3,7 +3,7 @@ import { Plus, Minus, Trash2, CalendarClock, Truck, Bell, BellOff, Pencil } from
 import { catLabel } from '../data.js';
 import { STATUS, expiryInfo, formatDate, isCounted, money, qtyOf, stockStatus } from '../lib.js';
 
-export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMute, onSetQty, onRename, onSetMin }) {
+export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMute, onSetQty, onEdit, onSetMin }) {
   const status = stockStatus(item);
   const s = STATUS[status];
   const cat = catLabel(item.category);
@@ -15,21 +15,18 @@ export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMut
     <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/5 transition hover:shadow-lg">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-lg font-bold leading-snug">{item.name}</h3>
+          <h3 className="text-lg font-bold leading-snug"><button onClick={() => onEdit(item.id)} className="text-right hover:text-orange-600">{item.name}</button></h3>
           <span className="text-sm text-stone-500">{cat.emoji} {cat.label}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <span className={`rounded-full px-3 py-1 text-xs font-bold ${s.badge}`}>{s.label}</span>
           <button
-            onClick={() => {
-              const v = window.prompt('שם חדש לפריט:', item.name);
-              if (v !== null && v.trim() && v.trim() !== item.name) onRename(item.id, v.trim());
-            }}
-            aria-label={`ערוך שם ל${item.name}`}
-            title="עריכת שם"
-            className="rounded-full p-1.5 text-stone-300 transition hover:bg-stone-100 hover:text-stone-600"
+            onClick={() => onEdit(item.id)}
+            aria-label={`ערוך פריט ${item.name}`}
+            title="עריכת כל פרטי הפריט"
+            className="flex items-center gap-1 rounded-full bg-stone-100 px-3 py-1 text-xs font-bold text-stone-600 transition hover:bg-orange-100 hover:text-orange-700"
           >
-            <Pencil size={16} />
+            <Pencil size={12} /> עריכה
           </button>
           <button
             onClick={() => onToggleMute(item.id)}
