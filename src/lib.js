@@ -34,8 +34,8 @@ export const money = (n) => `₪${(Math.round((n || 0) * 100) / 100).toLocaleStr
 
 export const isCounted = (i) => i.quantity !== null && i.quantity !== undefined;
 export const qtyOf = (i) => (isCounted(i) ? i.quantity : 0);
-export const needsOrder = (i) => isCounted(i) && i.quantity < i.lowThreshold;
-export const stockStatus = (i) => (!isCounted(i) ? 'unknown' : i.quantity <= 0 ? 'out' : i.quantity < i.lowThreshold ? 'low' : 'full');
+export const needsOrder = (i) => !i.muted && isCounted(i) && i.quantity < i.lowThreshold;
+export const stockStatus = (i) => (!isCounted(i) ? 'unknown' : i.muted && i.quantity < i.lowThreshold ? 'muted' : i.quantity <= 0 ? 'out' : i.quantity < i.lowThreshold ? 'low' : 'full');
 export const stockValue = (i) => (isCounted(i) && i.price ? i.quantity * i.price : 0);
 export const suggestQty = (i) => i.lastOrderQty || Math.max(Math.ceil((i.max || 1) - qtyOf(i)), 1);
 
@@ -43,6 +43,7 @@ export const STATUS = {
   full: { label: 'מלא', bar: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
   low: { label: 'מלאי נמוך', bar: 'bg-amber-400', badge: 'bg-amber-100 text-amber-700' },
   out: { label: 'אזל', bar: 'bg-red-500', badge: 'bg-red-100 text-red-700' },
+  muted: { label: 'מושתק', bar: 'bg-stone-300', badge: 'bg-stone-100 text-stone-500' },
   unknown: { label: 'לא נספר', bar: 'bg-stone-300', badge: 'bg-stone-100 text-stone-500' },
 };
 

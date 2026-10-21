@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Package, AlertTriangle, CalendarClock, Plus, Search, ShoppingCart, LayoutGrid, CheckCircle2, Circle,
-  ChefHat, PackageCheck, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet,
+  ChefHat, PackageCheck, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet, BellOff,
 } from 'lucide-react';
 import { CATEGORIES, catLabel, seedItems, seedOrders } from './data.js';
 import {
@@ -45,6 +45,7 @@ export default function App() {
   const [category, setCategory] = useState('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('name');
+  const [onlyMuted, setOnlyMuted] = useState(false);
   const [view, setView] = useState(() => load(VIEW_KEY, 'grouped'));
   const [openGroups, setOpenGroups] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -140,6 +141,7 @@ export default function App() {
     setItems((p) => [...p, { ...data, id: `n-${Date.now()}` }]);
     setShowAdd(false);
   };
+  const toggleMute = guard((id) => setItems((p) => p.map((i) => (i.id === id ? { ...i, muted: !i.muted } : i))));
   const toggleCheck = guard((id) => setChecked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id])));
   const restockChecked = guard(() => {
     setItems((p) => p.map((i) => (checked.includes(i.id) ? { ...i, quantity: Math.max(qtyOf(i), i.max) } : i)));
@@ -171,7 +173,7 @@ export default function App() {
 
   const visible = useMemo(() => {
     const q = query.trim();
-    const list = items.filter((i) => (category === 'all' || i.category === category) && i.name.includes(q));
+    const list = items.filter((i) => (category === 'all' || i.category === category) && (!onlyMuted || i.muted) && i.name.includes(q));
     const far = Number.MAX_SAFE_INTEGER;
     const sorters = {
       name: (a, b) => a.name.localeCompare(b.name, 'he'),
@@ -180,7 +182,7 @@ export default function App() {
       expiry: (a, b) => (daysUntil(a.expiry) ?? far) - (daysUntil(b.expiry) ?? far),
     };
     return [...list].sort(sorters[sort]);
-  }, [items, category, query, sort]);
+  }, [items, category, query, sort, onlyMuted]);
 
   const sections = useMemo(
     () => CATEGORIES
@@ -209,7 +211,7 @@ export default function App() {
 
   const grid = (list) => (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {list.map((i) => <ItemCard key={i.id} item={i} rhythm={rhythms.get(i.name)} onAdjust={adjust} onDelete={remove} />)}
+      {list.map((i) => <ItemCard key={i.id} item={i} rhythm={rhythms.get(i.name)} onAdjust={adjust} onDelete={remove} onToggleMute={toggleMute} />)}
     </div>
   );
 
@@ -287,6 +289,14 @@ export default function App() {
                 </button>
               );
             })}
+            <button
+              onClick={() => setOnlyMuted((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                onlyMuted ? 'bg-amber-500 text-white shadow' : 'bg-white text-stone-600 ring-1 ring-black/5 hover:bg-amber-50'
+              }`}
+            >
+              <BellOff size={14} /> מושתקים ({items.filter((i) => i.muted).length})
+            </button>
           </div>
 
           <div className="mb-6 flex flex-wrap gap-3">

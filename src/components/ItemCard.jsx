@@ -1,9 +1,9 @@
 import React from 'react';
-import { Plus, Minus, Trash2, CalendarClock, Truck } from 'lucide-react';
+import { Plus, Minus, Trash2, CalendarClock, Truck, Bell, BellOff } from 'lucide-react';
 import { catLabel } from '../data.js';
 import { STATUS, expiryInfo, formatDate, isCounted, money, qtyOf, stockStatus } from '../lib.js';
 
-export default function ItemCard({ item, rhythm, onAdjust, onDelete }) {
+export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMute }) {
   const status = stockStatus(item);
   const s = STATUS[status];
   const cat = catLabel(item.category);
@@ -20,6 +20,14 @@ export default function ItemCard({ item, rhythm, onAdjust, onDelete }) {
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <span className={`rounded-full px-3 py-1 text-xs font-bold ${s.badge}`}>{s.label}</span>
+          <button
+            onClick={() => onToggleMute(item.id)}
+            aria-label={item.muted ? `החזר התראות ל${item.name}` : `השתק התראות ל${item.name}`}
+            title={item.muted ? 'מושתק – לא יופיע כחסר. לחץ להחזרת התראות' : 'השתק: אל תציג כחסר'}
+            className={`rounded-full p-1.5 transition ${item.muted ? 'bg-amber-100 text-amber-600' : 'text-stone-300 hover:bg-stone-100 hover:text-stone-600'}`}
+          >
+            {item.muted ? <BellOff size={16} /> : <Bell size={16} />}
+          </button>
           <button
             onClick={() => onDelete(item.id)}
             aria-label={`מחק ${item.name}`}
