@@ -13,3 +13,9 @@ export const catLabel = (id) => CATEGORIES.find((c) => c.id === id) || CATEGORIE
 
 export const seedItems = () => structuredClone(seed.items);
 export const seedOrders = () => structuredClone(seed.orders);
+
+// Orders shipped with the app are merged into any saved state, unless the user deleted them.
+export const mergeSeedOrders = (orders, removed = []) => {
+  const have = new Set(orders.map((o) => o.id));
+  return [...orders, ...seed.orders.filter((o) => !have.has(o.id) && !removed.includes(o.id))];
+};

@@ -3,7 +3,7 @@ import {
   Package, AlertTriangle, CalendarClock, Plus, Search, ShoppingCart, LayoutGrid, CheckCircle2, Circle,
   ChefHat, PackageCheck, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet, BellOff,
 } from 'lucide-react';
-import { CATEGORIES, catLabel, seedItems, seedOrders } from './data.js';
+import { CATEGORIES, catLabel, mergeSeedOrders, seedItems, seedOrders } from './data.js';
 import {
   daysUntil, EXPIRY_SOON_DAYS, load, money, needsOrder, normalizeState, orderStats, qtyOf, save, STATUS, stockStatus, stockValue,
 } from './lib.js';
@@ -19,6 +19,7 @@ import OrdersHistory from './components/OrdersHistory.jsx';
 
 const ITEMS_KEY = 'kitchen-inventory:v2:items';
 const ORDERS_KEY = 'kitchen-inventory:v2:orders';
+const REMOVED_KEY = 'kitchen-inventory:v2:removedOrders';
 const CHECKED_KEY = 'kitchen-inventory:v2:checked';
 const VIEW_KEY = 'kitchen-inventory:v2:view';
 const CODE_KEY = 'kitchen-inventory:code';
@@ -39,7 +40,8 @@ function StatCard({ icon: Icon, label, value, tone }) {
 
 export default function App() {
   const [items, setItems] = useState(() => load(ITEMS_KEY, seedItems()));
-  const [orders, setOrders] = useState(() => load(ORDERS_KEY, seedOrders()));
+  const [removedOrders, setRemovedOrders] = useState(() => load(REMOVED_KEY, []));
+  const [orders, setOrders] = useState(() => mergeSeedOrders(load(ORDERS_KEY, seedOrders()), load(REMOVED_KEY, [])));
   const [checked, setChecked] = useState(() => load(CHECKED_KEY, []));
   const [tab, setTab] = useState('inventory');
   const [category, setCategory] = useState('all');
@@ -61,6 +63,7 @@ export default function App() {
   useEffect(() => save(ITEMS_KEY, items), [items]);
   useEffect(() => save(ORDERS_KEY, orders), [orders]);
   useEffect(() => save(CHECKED_KEY, checked), [checked]);
+  useEffect(() => save(REMOVED_KEY, removedOrders), [removedOrders]);
   useEffect(() => save(VIEW_KEY, view), [view]);
 
   useEffect(() => watchEditor(setIsEditor), []);
@@ -72,7 +75,8 @@ export default function App() {
     lastRemote.current = data.payload;
     setItems(next.items);
     setChecked(next.checked);
-    setOrders(next.orders);
+    setOrders(mergeSeedOrders(next.orders, next.removedOrders));
+    setRemovedOrders(next.removedOrders);
   };
 
   useEffect(() => {
@@ -93,14 +97,14 @@ export default function App() {
 
   useEffect(() => {
     if (!code || !isEditor || !writesReady.current) return undefined;
-    const payload = JSON.stringify({ items, checked, orders });
+    const payload = JSON.stringify({ items, checked, orders, removedOrders });
     if (payload === lastRemote.current) return undefined;
     const t = setTimeout(() => {
       lastRemote.current = payload;
       saveKitchen(code, { payload }).then(() => setSyncStatus('ok')).catch(() => setSyncStatus('error'));
     }, 500);
     return () => clearTimeout(t);
-  }, [items, checked, orders, code, isEditor]);
+  }, [items, checked, orders, removedOrders, code, isEditor]);
 
   const joinKitchen = async (raw) => {
     if (!isValidCode(raw)) throw new Error('הקוד אינו תקין');
@@ -115,7 +119,7 @@ export default function App() {
       throw new Error('הזן את סיסמת העריכה ואז לחץ שוב');
     }
     const fresh = newKitchenCode();
-    const payload = JSON.stringify({ items, checked, orders });
+    const payload = JSON.stringify({ items, checked, orders, removedOrders });
     await saveKitchen(fresh, { payload }).catch(() => { throw new Error('אין חיבור לשרת, נסה שוב'); });
     lastRemote.current = payload;
     setCode(fresh);
@@ -153,12 +157,16 @@ export default function App() {
     setTab('history');
   });
   const deleteOrderRow = guard((id) => {
-    if (window.confirm('למחוק את שורת ההזמנה?')) setOrders((p) => p.filter((o) => o.id !== id));
+    if (window.confirm('למחוק את שורת ההזמנה?')) {
+      setOrders((p) => p.filter((o) => o.id !== id));
+      setRemovedOrders((p) => [...p, id]);
+    }
   });
   const resetToFile = guard(() => {
     if (window.confirm('לטעון מחדש את המלאי והיסטוריית ההזמנות מקובץ ההתחלה? כל השינויים הנוכחיים יימחקו.')) {
       setItems(seedItems());
       setOrders(seedOrders());
+      setRemovedOrders([]);
       setChecked([]);
     }
   });

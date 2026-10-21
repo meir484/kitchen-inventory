@@ -60,6 +60,7 @@ export const normalizeState = (s) => ({
   items: Array.isArray(s?.items) ? s.items : [],
   checked: Array.isArray(s?.checked) ? s.checked : [],
   orders: Array.isArray(s?.orders) ? s.orders : [],
+  removedOrders: Array.isArray(s?.removedOrders) ? s.removedOrders : [],
 });
 
 const dayNum = (iso) => Math.round(Date.parse(`${iso}T00:00:00Z`) / 86400000);
