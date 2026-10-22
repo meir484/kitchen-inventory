@@ -65,6 +65,7 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState('off');
   const lastRemote = useRef('');
   const writesReady = useRef(false);
+  const unsynced = useRef(false);
 
   useEffect(() => save(ITEMS_KEY, items), [items]);
   useEffect(() => save(ORDERS_KEY, orders), [orders]);
@@ -91,12 +92,14 @@ export default function App() {
   useEffect(() => {
     save(CODE_KEY, code);
     writesReady.current = false;
+    unsynced.current = false;
     if (!code) { setSyncStatus('off'); return undefined; }
     setSyncStatus('syncing');
     return watchKitchen(
       code,
       (data) => {
-        if (data && data.payload !== lastRemote.current) applyRemote(data);
+        const first = !writesReady.current;
+        if (data && data.payload !== lastRemote.current && (first || !unsynced.current)) applyRemote(data);
         writesReady.current = true;
         setSyncStatus('ok');
       },
@@ -108,9 +111,13 @@ export default function App() {
     if (!code || !isEditor || !writesReady.current) return undefined;
     const payload = JSON.stringify({ items, checked, orders, removedOrders, appliedMigrations: applied });
     if (payload === lastRemote.current) return undefined;
+    unsynced.current = true;
     const t = setTimeout(() => {
       lastRemote.current = payload;
-      saveKitchen(code, { payload }).then(() => setSyncStatus('ok')).catch(() => setSyncStatus('error'));
+      saveKitchen(code, { payload })
+        .then(() => setSyncStatus('ok'))
+        .catch(() => setSyncStatus('error'))
+        .finally(() => { unsynced.current = false; });
     }, 500);
     return () => clearTimeout(t);
   }, [items, checked, orders, removedOrders, applied, code, isEditor]);

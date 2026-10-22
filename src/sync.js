@@ -1,20 +1,36 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc, initializeFirestore, onSnapshot, setDoc } from 'firebase/firestore';
 
 // Public web identifiers; access is governed by the Firestore security rules.
+const API_KEY = 'AIzaSyDc5meJCPP0d1UqkAB7ubRn11FVCIlzv4c';
+const PROJECT_ID = 'kitchen-inventory-e54fd';
 const app = initializeApp({
-  apiKey: 'AIzaSyDc5meJCPP0d1UqkAB7ubRn11FVCIlzv4c',
-  authDomain: 'kitchen-inventory-e54fd.firebaseapp.com',
-  projectId: 'kitchen-inventory-e54fd',
-  storageBucket: 'kitchen-inventory-e54fd.firebasestorage.app',
+  apiKey: API_KEY,
+  authDomain: `${PROJECT_ID}.firebaseapp.com`,
+  projectId: PROJECT_ID,
+  storageBucket: `${PROJECT_ID}.firebasestorage.app`,
   messagingSenderId: '413846928233',
   appId: '1:413846928233:web:4b8d92ec1a555db0c15bf8',
 });
-// Some networks and filters break Firestore's streaming channel; fall back to long polling there.
-const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+const auth = getAuth(app);
 
-const ref = (code) => doc(db, 'kitchens', code);
+// Plain HTTPS (Firestore REST) instead of the SDK's long-lived streaming channel, which some
+// networks and filters leave hanging. Changes from other devices arrive by polling.
+const POLL_MS = 5000;
+const docUrl = (code) =>
+  `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/kitchens/${code}?key=${API_KEY}`;
+
+const http = async (url, options = {}, ms = 10000) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (e) {
+    throw new Error(e.name === 'AbortError' ? 'השרת לא הגיב בזמן' : 'אין חיבור לשרת');
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 export const newKitchenCode = () => {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -23,28 +39,54 @@ export const newKitchenCode = () => {
 
 export const isValidCode = (code) => /^[a-zA-Z0-9_-]{16,64}$/.test(code);
 
-export const fetchKitchen = async (code) => {
-  const snap = await getDoc(ref(code));
-  return snap.exists() ? snap.data() : null;
-};
-
 export const withTimeout = (promise, ms, message) =>
   Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))]);
 
-export const saveKitchen = (code, data) => setDoc(ref(code), { ...data, updatedAt: Date.now() });
+export const fetchKitchen = async (code) => {
+  const res = await http(docUrl(code));
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`שגיאת שרת (${res.status})`);
+  const json = await res.json();
+  return { payload: json.fields?.payload?.stringValue ?? '' };
+};
 
-export const watchKitchen = (code, onData, onError) =>
-  onSnapshot(
-    ref(code),
-    (snap) => {
-      if (!snap.metadata.hasPendingWrites) onData(snap.exists() ? snap.data() : null);
-    },
-    onError,
-  );
+export const saveKitchen = async (code, data) => {
+  const user = auth.currentUser;
+  if (!user) throw Object.assign(new Error('נדרשת סיסמת עריכה'), { code: 'permission-denied' });
+  const token = await user.getIdToken();
+  const res = await http(docUrl(code), {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ fields: { payload: { stringValue: data.payload }, updatedAt: { integerValue: String(Date.now()) } } }),
+  });
+  if (res.status === 401 || res.status === 403) throw Object.assign(new Error('אין הרשאה לשמור'), { code: 'permission-denied' });
+  if (!res.ok) throw new Error(`השמירה נכשלה (${res.status})`);
+};
+
+export const watchKitchen = (code, onData, onError) => {
+  let stopped = false;
+  const tick = async () => {
+    if (stopped || document.hidden) return;
+    try {
+      const data = await fetchKitchen(code);
+      if (!stopped) onData(data);
+    } catch (e) {
+      if (!stopped) onError(e);
+    }
+  };
+  tick();
+  const id = setInterval(tick, POLL_MS);
+  const onVisible = () => !document.hidden && tick();
+  document.addEventListener('visibilitychange', onVisible);
+  return () => {
+    stopped = true;
+    clearInterval(id);
+    document.removeEventListener('visibilitychange', onVisible);
+  };
+};
 
 // One shared editor account; viewers need only the kitchen code, editors also need the password.
 export const EDITOR_EMAIL = 'editor@kitchen-inventory.app';
-const auth = getAuth(app);
 
 export const unlockEditing = async (password) => {
   try {
