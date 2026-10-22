@@ -1,6 +1,12 @@
 // One-time stock updates shipped with the app (e.g. receiving a delivery).
 // Each runs once per saved state; the applied ids travel with the synced data.
 const SHAMAI = 'ר. שמאי';
+const JERUSALEM = 'אריזות ירושלים';
+const receivedJ = (qty) => ({ supplier: JERUSALEM, lastOrderQty: qty, lastOrderDate: '2026-10-21' });
+const newDry = (key, name, qty, price) => ({
+  id: `receipt-658402-${key}`, name, category: 'dry', quantity: qty, unit: 'יח׳', lowThreshold: 0, max: qty, expiry: '',
+  supplier: JERUSALEM, price, lastOrderQty: qty, lastOrderDate: '2026-10-21',
+});
 const received = (qty) => ({ supplier: SHAMAI, lastOrderQty: qty, lastOrderDate: '2026-10-20' });
 
 export const MIGRATIONS = [
@@ -24,6 +30,25 @@ export const MIGRATIONS = [
         id: 'receipt-780721-rubber', name: 'גומי למשתנות ריחנית', category: 'shamai', quantity: 12, unit: 'יח׳',
         lowThreshold: 0, max: 12, expiry: '', supplier: SHAMAI, price: 10.9, lastOrderQty: 12, lastOrderDate: '2026-10-20',
       },
+    ],
+  },
+  {
+    id: 'receipt-658402',
+    adjust: [
+      { id: 'dry-11', add: 16, patch: receivedJ(16) }, // טחינה 3 ק"ג אחדות
+      { id: 'dry-44', add: 12, patch: receivedJ(12) }, // מלפפון מלח
+      { id: 'dry-31', set: 10, patch: receivedJ(10) }, // שוקוצ'ינו (לא נספר קודם)
+      { id: 'dry-39', add: 2, patch: receivedJ(2) }, // אבקת שום
+      { id: 'dry-58', add: 30, patch: receivedJ(30) }, // שמן קנולה 1 ליטר
+      { id: 'dry-12', add: 12, patch: receivedJ(12) }, // יין קברנה
+      { id: 'dry-46', add: 40, patch: receivedJ(40) }, // סוכר
+      { id: 'dry-54', add: 3, patch: { ...receivedJ(3), price: 136 } }, // קטשופ מנות (הלמנס 996 יח׳ במקום 1200)
+    ],
+    addItems: [
+      newDry('mustard', 'חרדל 5 ק"ג תלמה', 1, 78),
+      newDry('mushrooms', 'פטריות 8 חתוך בד"ץ רויאמיל', 24, 3.8),
+      newDry('apricot-syrup', 'סירופ משמש 4 ליטר רויאמיל', 4, 21),
+      newDry('cocktail-syrup', 'סירופ 4 ליטר קוקטייל למבדה אחדות', 4, 26),
     ],
   },
 ];
