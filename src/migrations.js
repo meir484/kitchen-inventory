@@ -51,6 +51,30 @@ export const MIGRATIONS = [
       newDry('cocktail-syrup', 'סירופ 4 ליטר קוקטייל למבדה אחדות', 4, 26),
     ],
   },
+  {
+    id: 'merge-syrups',
+    adjust: [],
+    addItems: [],
+    // All 4-litre syrups become one item; quantity and minimum are the sums of what was there.
+    transform: (items) => {
+      const isSyrup = (i) => i.name.startsWith('סירופ') && i.category === 'dry';
+      const syrups = items.filter(isSyrup);
+      if (!syrups.length) return items;
+      const counted = syrups.filter((i) => i.quantity !== null && i.quantity !== undefined);
+      const quantity = counted.length ? counted.reduce((sum, i) => sum + i.quantity, 0) : null;
+      const lowThreshold = syrups.reduce((sum, i) => sum + (i.lowThreshold || 0), 0);
+      const latest = [...syrups].filter((i) => i.lastOrderDate).sort((a, b) => b.lastOrderDate.localeCompare(a.lastOrderDate))[0];
+      const merged = {
+        id: 'syrups-merged', name: 'פטל בטעמים', category: 'dry', unit: 'יח׳', quantity, lowThreshold,
+        max: Math.max(quantity || 0, lowThreshold * 2, 1), expiry: '', supplier: 'אריזות ירושלים', price: 21,
+        lastOrderQty: latest?.lastOrderQty ?? null, lastOrderDate: latest?.lastOrderDate ?? '',
+      };
+      const first = items.findIndex(isSyrup);
+      const rest = items.filter((i) => !isSyrup(i));
+      rest.splice(first, 0, merged);
+      return rest;
+    },
+  },
 ];
 
 export function runMigrations(items, applied = []) {
@@ -66,6 +90,7 @@ export function runMigrations(items, applied = []) {
     });
     const have = new Set(next.map((i) => i.id));
     next = [...next, ...m.addItems.filter((i) => !have.has(i.id))];
+    if (m.transform) next = m.transform(next);
     done.push(m.id);
   });
   return { items: next, applied: done };
