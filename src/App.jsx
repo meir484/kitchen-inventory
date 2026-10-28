@@ -3,14 +3,13 @@ import {
   Package, AlertTriangle, CalendarClock, Plus, Search, ShoppingCart, LayoutGrid, CheckCircle2, Circle,
   ChefHat, PackageCheck, FileSpreadsheet, Download, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet, BellOff,
 } from 'lucide-react';
-import { catLabel, categoriesOf, exampleItems, mergeSeedOrders } from './data.js';
+import { catLabel, categoriesOf, exampleItems } from './data.js';
 import {
   daysUntil, downloadBlob, EXPIRY_SOON_DAYS, load, money, needsOrder, normalizeState, orderStats, qtyOf, save, STATUS, stockStatus, stockValue, todayIso,
 } from './lib.js';
 import {
   fetchDoc, isValidCode, loginAccount, lockEditing, newKitchenCode, registerAccount, resetPassword, saveDoc, watchAuth, watchDoc, withTimeout,
 } from './sync.js';
-import { runMigrations } from './migrations.js';
 import ItemCard from './components/ItemCard.jsx';
 import EditModal from './components/EditModal.jsx';
 import ImportModal from './components/ImportModal.jsx';
@@ -45,11 +44,11 @@ function StatCard({ icon: Icon, label, value, tone }) {
 }
 
 export default function App() {
-  const [boot] = useState(() => runMigrations(load(ITEMS_KEY, null) ?? exampleItems(), load(APPLIED_KEY, [])));
-  const [items, setItems] = useState(boot.items);
-  const [applied, setApplied] = useState(boot.applied);
+  const [items, setItems] = useState(() => load(ITEMS_KEY, null) ?? exampleItems());
+  // Ids of one-time updates applied by earlier versions; kept as is so that older open tabs never repeat them.
+  const [applied, setApplied] = useState(() => load(APPLIED_KEY, []));
   const [removedOrders, setRemovedOrders] = useState(() => load(REMOVED_KEY, []));
-  const [orders, setOrders] = useState(() => mergeSeedOrders(load(ORDERS_KEY, []), load(REMOVED_KEY, []), boot.items));
+  const [orders, setOrders] = useState(() => load(ORDERS_KEY, []));
   const [checked, setChecked] = useState(() => load(CHECKED_KEY, []));
   const [tab, setTab] = useState('inventory');
   const [category, setCategory] = useState('all');
@@ -93,11 +92,10 @@ export default function App() {
   const applyRemote = (data) => {
     const next = normalizeState(JSON.parse(data.payload));
     lastRemote.current = data.payload;
-    const migrated = runMigrations(next.items, next.appliedMigrations);
-    setItems(migrated.items);
-    setApplied(migrated.applied);
+    setItems(next.items);
+    setApplied(next.appliedMigrations);
     setChecked(next.checked);
-    setOrders(mergeSeedOrders(next.orders, next.removedOrders, migrated.items));
+    setOrders(next.orders);
     setRemovedOrders(next.removedOrders);
   };
 
