@@ -68,35 +68,35 @@ export default function OrderModal({ items, onClose, onSaveOrder }) {
     })));
   };
 
-  const btn = 'flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-bold transition disabled:opacity-40';
+  const btn = 'btn';
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-3xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-stone-100 p-5">
-          <h2 className="text-xl font-extrabold">רשימת הזמנה</h2>
-          <button onClick={onClose} aria-label="סגור" className="rounded-full p-2 hover:bg-stone-100"><X size={20} /></button>
+      <div onClick={(e) => e.stopPropagation()} className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-card bg-surface shadow-hover">
+        <div className="flex items-center justify-between border-b border-line p-5">
+          <h2 className="t-section">רשימת הזמנה</h2>
+          <button onClick={onClose} aria-label="סגור" className="icon-btn -me-2"><X size={20} /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
           {groups.map(([supplier, list]) => (
             <div key={supplier} className="mb-5">
-              <h3 className="mb-2 font-bold text-orange-600">{supplier}</h3>
-              <ul className="divide-y divide-stone-100 rounded-2xl ring-1 ring-stone-100">
+              <h3 className="mb-2 font-bold text-primary">{supplier}</h3>
+              <ul className="divide-y divide-line rounded-card ring-1 ring-line">
                 {list.map((i) => {
                   const off = skip.includes(i.id);
                   return (
                     <li key={i.id} className={`flex items-center gap-3 p-3 ${off ? 'opacity-40' : ''}`}>
-                      <input type="checkbox" checked={!off} aria-label={`כלול ${i.name}`}
+                      <label className="-me-1 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center"><input type="checkbox" checked={!off} aria-label={`כלול ${i.name}`}
                         onChange={() => setSkip((p) => (off ? p.filter((x) => x !== i.id) : [...p, i.id]))}
-                        className="h-5 w-5 accent-orange-500" />
+                        className="h-6 w-6 accent-primary" /></label>
                       <div className="min-w-0 flex-1">
                         <div className="font-medium leading-snug">{i.name}</div>
-                        <div className="text-xs text-stone-400">במלאי {i.quantity} · מינימום {i.lowThreshold}{i.price ? ` · ${money(i.price)} ליח׳` : ''}</div>
+                        <div className="text-xs text-ink-3">במלאי {i.quantity} · מינימום {i.lowThreshold}{i.price ? ` · ${money(i.price)} ליח׳` : ''}</div>
                       </div>
                       <input type="number" min="0" value={qty[i.id]} aria-label={`כמות ל${i.name}`}
                         onChange={(e) => setQty((p) => ({ ...p, [i.id]: e.target.value }))}
-                        className="w-20 rounded-lg border border-stone-200 bg-stone-50 px-2 py-1.5 text-center outline-none focus:border-orange-400" />
+                        className="field h-11 w-24 px-2 text-center" />
                     </li>
                   );
                 })}
@@ -105,21 +105,21 @@ export default function OrderModal({ items, onClose, onSaveOrder }) {
           ))}
         </div>
 
-        <div className="space-y-3 border-t border-stone-100 p-5">
+        <div className="space-y-3 border-t border-line p-5">
           <div className="flex items-center justify-between">
-            <span className="text-stone-500">{lines.length} פריטים בהזמנה</span>
-            <span className="text-lg font-extrabold">{grand > 0 ? `סה״כ משוער: ${money(grand)}` : ''}</span>
+            <span className="text-ink-3">{lines.length} פריטים בהזמנה</span>
+            <span className="text-lg font-bold">{grand > 0 ? `סה״כ משוער: ${money(grand)}` : ''}</span>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <button disabled={!lines.length} onClick={copy} className={`${btn} bg-stone-900 text-white`}><Copy size={16} />{copied ? 'הועתק' : 'העתק'}</button>
+            <button disabled={!lines.length} onClick={copy} className={`${btn} bg-ink text-on-solid`}><Copy size={16} />{copied ? 'הועתק' : 'העתק'}</button>
             <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer"
-              className={`${btn} bg-emerald-500 text-white ${lines.length ? '' : 'pointer-events-none opacity-40'}`}><MessageCircle size={16} />וואטסאפ</a>
-            <button disabled={!lines.length} onClick={print} className={`${btn} bg-stone-100 hover:bg-stone-200`}><Printer size={16} />הדפס</button>
+              className={`${btn} border border-success/30 bg-success-soft text-success-text hover:brightness-95 ${lines.length ? '' : 'pointer-events-none opacity-40'}`}><MessageCircle size={16} />וואטסאפ</a>
+            <button disabled={!lines.length} onClick={print} className={`${btn} bg-tint hover:bg-tint-strong`}><Printer size={16} />הדפס</button>
           </div>
           <div className="flex gap-2">
             <input value={invoice} onChange={(e) => setInvoice(e.target.value)} placeholder="מס׳ חשבונית"
-              className="min-w-0 flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 outline-none focus:border-orange-400" />
-            <button disabled={!lines.length} onClick={saveOrder} className={`${btn} bg-gradient-to-l from-orange-500 to-rose-500 text-white`}>
+              className="field min-w-0 flex-1" />
+            <button disabled={!lines.length} onClick={saveOrder} className="btn-primary">
               <ClipboardCheck size={16} /> שמור בהיסטוריה
             </button>
           </div>

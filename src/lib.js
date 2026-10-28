@@ -35,25 +35,34 @@ export const money = (n) => `₪${(Math.round((n || 0) * 100) / 100).toLocaleStr
 export const isCounted = (i) => i.quantity !== null && i.quantity !== undefined;
 export const qtyOf = (i) => (isCounted(i) ? i.quantity : 0);
 export const needsOrder = (i) => !i.muted && isCounted(i) && i.quantity < i.lowThreshold;
-export const stockStatus = (i) => (!isCounted(i) ? 'unknown' : i.muted && i.quantity < i.lowThreshold ? 'muted' : i.quantity <= 0 ? 'out' : i.quantity < i.lowThreshold ? 'low' : 'full');
+// 'near' is only a visual warning (within 1.5x of the minimum); what needs ordering is still needsOrder().
+export const stockStatus = (i) => {
+  if (!isCounted(i)) return 'unknown';
+  if (i.muted && i.quantity < i.lowThreshold) return 'muted';
+  if (i.quantity <= 0) return 'out';
+  if (i.quantity < i.lowThreshold) return 'low';
+  if (i.lowThreshold > 0 && i.quantity <= i.lowThreshold * 1.5) return 'near';
+  return 'full';
+};
 export const stockValue = (i) => (isCounted(i) && i.price ? i.quantity * i.price : 0);
 export const suggestQty = (i) => i.lastOrderQty || Math.max(Math.ceil((i.max || 1) - qtyOf(i)), 1);
 
 export const STATUS = {
-  full: { label: 'מלא', bar: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
-  low: { label: 'מלאי נמוך', bar: 'bg-amber-400', badge: 'bg-amber-100 text-amber-700' },
-  out: { label: 'אזל', bar: 'bg-red-500', badge: 'bg-red-100 text-red-700' },
-  muted: { label: 'מושתק', bar: 'bg-stone-300', badge: 'bg-stone-100 text-stone-500' },
-  unknown: { label: 'לא נספר', bar: 'bg-stone-300', badge: 'bg-stone-100 text-stone-500' },
+  full: { label: 'מלא', bar: 'bg-ink-2', badge: 'bg-success-soft text-success-text' },
+  near: { label: 'כמעט נגמר', bar: 'bg-bar-warn', badge: 'bg-primary-soft text-primary' },
+  low: { label: 'לחידוש', bar: 'bg-danger', badge: 'bg-danger-soft text-danger-text' },
+  out: { label: 'אזל', bar: 'bg-danger', badge: 'bg-danger-soft text-danger-text' },
+  muted: { label: 'מושתק', bar: 'bg-line-strong', badge: 'bg-tint text-ink-2' },
+  unknown: { label: 'לא נספר', bar: 'bg-line-strong', badge: 'bg-tint text-ink-2' },
 };
 
 export function expiryInfo(expiry) {
   const d = daysUntil(expiry);
   if (d === null) return null;
-  if (d < 0) return { text: `פג תוקף לפני ${-d} ימים`, cls: 'text-red-600 font-bold' };
-  if (d === 0) return { text: 'פג תוקף היום', cls: 'text-red-600 font-bold' };
-  if (d <= EXPIRY_SOON_DAYS) return { text: `פג בעוד ${d} ימים`, cls: 'text-amber-600 font-bold' };
-  return { text: `תוקף עד ${formatDate(expiry)}`, cls: 'text-stone-500' };
+  if (d < 0) return { text: `פג תוקף לפני ${-d} ימים`, cls: 'text-danger-text font-semibold' };
+  if (d === 0) return { text: 'פג תוקף היום', cls: 'text-danger-text font-semibold' };
+  if (d <= EXPIRY_SOON_DAYS) return { text: `פג בעוד ${d} ימים`, cls: 'text-warning-text font-semibold' };
+  return { text: `תוקף עד ${formatDate(expiry)}`, cls: 'text-ink-2' };
 }
 
 export const normalizeState = (s) => ({

@@ -37,15 +37,15 @@ export default function EditModal({ item, categories, suppliers, onClose, onSave
     });
   };
 
-  const input = 'w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-200';
-  const label = 'mb-1 block text-sm font-medium text-stone-600';
+  const input = 'field';
+  const label = 't-label mb-1 block';
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
-      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-card border border-line bg-surface p-6 shadow-hover">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-xl font-extrabold">עריכת פריט</h2>
-          <button type="button" onClick={onClose} aria-label="סגור" className="rounded-full p-2 hover:bg-stone-100"><X size={20} /></button>
+          <h2 className="t-section">עריכת פריט</h2>
+          <button type="button" onClick={onClose} aria-label="סגור" className="icon-btn -me-2"><X size={20} /></button>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2">
@@ -86,7 +86,7 @@ export default function EditModal({ item, categories, suppliers, onClose, onSave
           </div>
           <div className="col-span-2">
             <button type="button" onClick={() => set('muted', !f.muted)}
-              className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-right transition ${f.muted ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' : 'bg-stone-50 text-stone-600 ring-1 ring-stone-200'}`}>
+              className={`flex min-h-11 w-full items-center gap-2 rounded-control border px-3 text-right text-sm font-medium transition ${f.muted ? 'border-warning/40 bg-warning-soft text-warning-text' : 'border-line-strong bg-subtle text-ink-2'}`}>
               {f.muted ? <BellOff size={18} /> : <Bell size={18} />}
               {f.muted ? 'מושתק – לא יופיע כחסר ולא ייכנס להזמנות' : 'התראות מלאי נמוך פעילות'}
             </button>
@@ -97,12 +97,12 @@ export default function EditModal({ item, categories, suppliers, onClose, onSave
           </div>
         </div>
         <div className="mt-6 flex gap-3">
-          <button type="submit" disabled={!valid} className="flex-1 rounded-xl bg-gradient-to-l from-orange-500 to-rose-500 py-3 font-bold text-white shadow transition hover:opacity-90 disabled:opacity-40">
+          <button type="submit" disabled={!valid} className="btn-primary flex-1">
             שמור שינויים
           </button>
-          <button type="button" onClick={onClose} className="rounded-xl bg-stone-100 px-5 py-3 font-medium hover:bg-stone-200">ביטול</button>
+          <button type="button" onClick={onClose} className="btn-secondary">ביטול</button>
         </div>
-        <button type="button" onClick={() => onDelete(item.id)} className="mt-3 flex items-center gap-2 text-sm text-red-500 hover:underline">
+        <button type="button" onClick={() => onDelete(item.id)} className="btn mt-3 px-3 text-sm text-danger-text hover:bg-danger-soft">
           <Trash2 size={14} /> מחק את הפריט
         </button>
       </form>

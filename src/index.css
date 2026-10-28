@@ -2,6 +2,166 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50 font-sans text-stone-800 min-h-screen;
+/* ---------- Design tokens (single source of truth for color) ---------- */
+:root {
+  --page: 255 249 239;          /* cream */
+  --surface: 255 255 255;
+  --subtle: 255 252 247;
+  --tint: 245 239 228;          /* soft neutral fill: idle controls, bar track */
+  --tint-strong: 237 229 215;
+  --line: 238 229 216;
+  --line-strong: 217 204 186;
+
+  --ink: 41 37 36;              /* primary text */
+  --ink-2: 87 83 78;            /* secondary text */
+  --ink-3: 107 100 94;          /* captions, still AA (5.5:1 on cream) */
+  --on-solid: 255 255 255;      /* text on any solid fill */
+
+  --primary: 194 65 12;
+  --primary-hover: 154 52 18;
+  --primary-soft: 255 240 227;
+  --brand-end: 190 18 60;       /* end of the brand gradient */
+
+  --success: 5 150 105;
+  --success-soft: 209 250 229;
+  --success-text: 6 95 70;
+  --warning: 217 119 6;
+  --warning-soft: 254 243 199;
+  --warning-text: 146 64 14;
+  --danger: 225 29 72;
+  --danger-soft: 255 228 230;
+  --danger-text: 159 18 57;
+  --info: 2 132 199;
+  --info-soft: 224 242 254;
+  --info-text: 7 89 133;
+  --bar-warn: 234 88 12;
+
+  --focus: 234 88 12;
+  --radius-card: 16px;
+  --radius-control: 12px;
+  --shadow-card: 0 1px 2px rgb(41 37 36 / 0.04), 0 4px 14px -6px rgb(41 37 36 / 0.08);
+  --shadow-hover: 0 2px 4px rgb(41 37 36 / 0.05), 0 12px 26px -10px rgb(41 37 36 / 0.16);
+  color-scheme: light;
+}
+
+.dark {
+  --page: 18 16 14;
+  --surface: 28 25 23;
+  --subtle: 23 21 19;
+  --tint: 41 37 36;
+  --tint-strong: 55 50 48;
+  --line: 58 52 48;
+  --line-strong: 87 79 73;
+
+  --ink: 245 245 244;
+  --ink-2: 214 211 209;
+  --ink-3: 168 162 158;
+  --on-solid: 28 25 23;
+
+  --primary: 251 146 60;
+  --primary-hover: 253 186 116;
+  --primary-soft: 58 29 14;
+  --brand-end: 251 113 133;
+
+  --success: 52 211 153;
+  --success-soft: 5 46 34;
+  --success-text: 110 231 183;
+  --warning: 251 191 36;
+  --warning-soft: 58 42 7;
+  --warning-text: 252 211 77;
+  --danger: 251 113 133;
+  --danger-soft: 63 13 26;
+  --danger-text: 253 164 175;
+  --info: 56 189 248;
+  --info-soft: 8 47 73;
+  --info-text: 125 211 252;
+  --bar-warn: 251 146 60;
+
+  --focus: 251 146 60;
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 8px 22px -10px rgb(0 0 0 / 0.7);
+  --shadow-hover: 0 1px 0 rgb(255 255 255 / 0.05) inset, 0 14px 30px -12px rgb(0 0 0 / 0.85);
+  color-scheme: dark;
+}
+
+/* ---------- Base ---------- */
+@layer base {
+  body {
+    @apply min-h-screen bg-page font-sans text-ink antialiased;
+    font-size: 15px;
+    line-height: 1.55;
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--focus));
+    outline-offset: 2px;
+  }
+  ::placeholder {
+    color: rgb(var(--ink-3));
+    opacity: 1;
+  }
+  button { @apply cursor-pointer; }
+  button:disabled { @apply cursor-not-allowed; }
+}
+
+/* ---------- Type scale: one family, hierarchy from size + weight ---------- */
+@layer components {
+  .t-title   { @apply text-[28px] font-bold leading-tight; }
+  .t-section { @apply text-xl font-bold leading-snug sm:text-[22px]; }
+  .t-product { @apply text-[17px] font-bold leading-snug sm:text-lg; }
+  .t-number  { @apply text-2xl font-bold leading-none sm:text-[28px]; }
+  .t-stat    { @apply text-[26px] font-bold leading-none sm:text-[30px]; }
+  .t-label   { @apply text-[13px] font-semibold text-ink-2; }
+  .t-meta    { @apply text-[13px] text-ink-3; }
+  .t-micro   { @apply text-xs text-ink-3; }
+
+  /* surfaces */
+  .card { @apply rounded-card border border-line bg-surface shadow-card; }
+  .field {
+    @apply w-full rounded-control border border-line-strong bg-surface px-3 py-2.5 text-ink outline-none transition;
+    @apply focus:border-primary focus:ring-2 focus:ring-primary/25;
+  }
+
+  /* buttons: 44px minimum height on every size */
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-control px-4 text-[15px] font-semibold transition;
+    @apply disabled:opacity-45;
+  }
+  .btn-secondary { @apply btn border border-line-strong bg-surface text-ink hover:bg-tint; }
+  .btn-primary   { @apply btn bg-primary text-on-solid hover:bg-primary-hover; }
+  .btn-brand     { @apply btn bg-gradient-to-l from-primary to-brand-end text-on-solid shadow-card hover:brightness-110; }
+  .btn-ink       { @apply btn bg-ink text-on-solid hover:opacity-90; }
+  .btn-danger-soft { @apply btn bg-danger-soft text-danger-text hover:brightness-95; }
+
+  /* one "selected" style for every segmented control (tabs, categories, view) */
+  .seg {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-control border border-line-strong bg-surface px-4 text-sm font-semibold text-ink-2 transition hover:bg-tint hover:text-ink;
+  }
+  .seg[aria-pressed='true'], .seg[aria-selected='true'], .seg[aria-current='page'] {
+    @apply border-ink bg-ink text-on-solid hover:bg-ink hover:text-on-solid;
+  }
+
+  .badge { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+  .icon-btn {
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-control text-ink-2 transition hover:bg-tint hover:text-ink;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* quantity stepper (+ / -): calm neutral buttons, meaning shows on hover */
+@layer components {
+  .step {
+    @apply inline-flex h-11 w-11 items-center justify-center rounded-control border border-line-strong bg-tint text-ink transition active:scale-95 disabled:opacity-40;
+  }
+  .step-up:not(:disabled):hover   { @apply border-success/40 bg-success-soft text-success-text; }
+  .step-down:not(:disabled):hover { @apply border-danger/40 bg-danger-soft text-danger-text; }
+  /* enlarges the tap area of small inline controls without changing how they look */
+  .hit { @apply relative; }
+  .hit::after { content: ''; position: absolute; inset: -8px; }
 }

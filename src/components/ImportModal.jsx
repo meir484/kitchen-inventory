@@ -52,42 +52,42 @@ export default function ImportModal({ items, orders, onClose, onApply }) {
     onApply(plan);
   };
 
-  const btn = 'flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-bold transition disabled:opacity-40';
+  const btn = 'btn';
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
+      <div onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-card border border-line bg-surface p-6 shadow-hover">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-xl font-extrabold"><FileSpreadsheet size={22} /> ייבוא מאקסל</h2>
-          <button onClick={onClose} aria-label="סגור" className="rounded-full p-2 hover:bg-stone-100"><X size={20} /></button>
+          <h2 className="flex items-center gap-2 t-section"><FileSpreadsheet size={22} /> ייבוא מאקסל</h2>
+          <button onClick={onClose} aria-label="סגור" className="icon-btn -me-2"><X size={20} /></button>
         </div>
 
         {!parsed ? (
           <>
-            <p className="mb-4 text-stone-600">
+            <p className="mb-4 text-ink-2">
               העלה קובץ אקסל (xlsx) והמערכת תיצור את כל המוצרים לבד. כל גיליון נחשב לקטגוריה, או שאפשר להוסיף עמודת "קטגוריה".
               גיליון בשם "יומן הזמנות" ייכנס להיסטוריית ההזמנות.
             </p>
-            <label className={`${btn} cursor-pointer bg-gradient-to-l from-orange-500 to-rose-500 py-3 text-white shadow`}>
+            <label className="btn-primary w-full cursor-pointer">
               <Upload size={18} /> {busy ? 'קורא את הקובץ…' : 'בחר קובץ אקסל'}
               <input type="file" accept=".xlsx" onChange={pick} disabled={busy} className="hidden" />
             </label>
-            <div className="mt-4 rounded-xl bg-stone-50 p-3 text-sm text-stone-600">
+            <div className="mt-4 rounded-control bg-subtle p-3 text-sm text-ink-2">
               <div className="mb-1 font-medium">עמודות שהמערכת מכירה:</div>
               שם פריט (חובה), קטגוריה, מלאי נוכחי, מלאי מינימלי, יחידה, ספק, מחיר ליחידה, תאריך תפוגה.
-              <button onClick={downloadTemplate} className="mt-3 flex items-center gap-2 font-bold text-orange-600 underline">
+              <button onClick={downloadTemplate} className="mt-3 flex items-center gap-2 font-bold text-primary underline">
                 <Download size={16} /> הורד תבנית אקסל מוכנה
               </button>
             </div>
           </>
         ) : (
           <>
-            <p className="mb-3 text-stone-500">{fileName}</p>
-            <ul className="mb-4 divide-y divide-stone-100 rounded-xl ring-1 ring-stone-100">
+            <p className="mb-3 text-ink-3">{fileName}</p>
+            <ul className="mb-4 divide-y divide-line rounded-control ring-1 ring-line">
               {parsed.report.map((r) => (
                 <li key={r.sheet} className="flex items-center justify-between p-3 text-sm">
                   <span className="font-medium">{r.sheet}</span>
-                  <span className={r.kind === 'skipped' ? 'text-stone-400' : 'text-stone-600'}>
+                  <span className={r.kind === 'skipped' ? 'text-ink-3' : 'text-ink-2'}>
                     {KIND[r.kind]}{r.kind !== 'skipped' ? ` · ${r.count}` : ''}
                   </span>
                 </li>
@@ -96,33 +96,33 @@ export default function ImportModal({ items, orders, onClose, onApply }) {
 
             <div className="mb-3 space-y-2 text-sm">
               <label className="flex items-start gap-2">
-                <input type="radio" name="mode" checked={mode === 'merge'} onChange={() => setMode('merge')} className="mt-1 accent-orange-500" />
+                <input type="radio" name="mode" checked={mode === 'merge'} onChange={() => setMode('merge')} className="mt-1 accent-primary" />
                 <span><b>הוסף ועדכן</b> – מוצרים חדשים יתווספו, ומוצרים בעלי אותו שם יתעדכנו לפי הקובץ. שום מוצר לא יימחק.</span>
               </label>
               <label className="flex items-start gap-2">
-                <input type="radio" name="mode" checked={mode === 'replace'} onChange={() => setMode('replace')} className="mt-1 accent-orange-500" />
+                <input type="radio" name="mode" checked={mode === 'replace'} onChange={() => setMode('replace')} className="mt-1 accent-primary" />
                 <span><b>החלף הכול</b> – המלאי הנוכחי יימחק ויוחלף במה שבקובץ.</span>
               </label>
               {parsed.orders.length > 0 && (
                 <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={includeOrders} onChange={(e) => setIncludeOrders(e.target.checked)} className="accent-orange-500" />
+                  <input type="checkbox" checked={includeOrders} onChange={(e) => setIncludeOrders(e.target.checked)} className="accent-primary" />
                   <span>ייבא גם את יומן ההזמנות ({parsed.orders.length} שורות)</span>
                 </label>
               )}
             </div>
 
-            <div className="mb-4 rounded-xl bg-sky-50 p-3 text-sm text-sky-800">
+            <div className="mb-4 rounded-control bg-info-soft p-3 text-sm text-info-text">
               {plan.added} מוצרים חדשים{mode === 'merge' ? ` · ${plan.updated} יעודכנו` : ''}
               {includeOrders && parsed.orders.length ? ` · ${plan.ordersAdded} שורות הזמנה חדשות` : ''}
             </div>
 
             <div className="flex gap-2">
-              <button onClick={apply} className={`${btn} flex-1 bg-gradient-to-l from-orange-500 to-rose-500 text-white shadow`}>אשר ייבוא</button>
-              <button onClick={() => setParsed(null)} className={`${btn} bg-stone-100 hover:bg-stone-200`}>קובץ אחר</button>
+              <button onClick={apply} className="btn-primary flex-1">אשר ייבוא</button>
+              <button onClick={() => setParsed(null)} className={`${btn} bg-tint hover:bg-tint-strong`}>קובץ אחר</button>
             </div>
           </>
         )}
-        {error && <p className="mt-4 rounded-xl bg-red-50 p-3 text-red-600">{error}</p>}
+        {error && <p className="mt-4 rounded-control bg-danger-soft p-3 text-danger-text">{error}</p>}
       </div>
     </div>
   );

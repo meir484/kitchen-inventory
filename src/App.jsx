@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Package, AlertTriangle, CalendarClock, Plus, Search, ShoppingCart, LayoutGrid, CheckCircle2, Circle,
-  ChefHat, PackageCheck, FileSpreadsheet, Download, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet, BellOff,
+  ChefHat, PackageCheck, FileSpreadsheet, Download, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet, BellOff, Moon, Sun,
 } from 'lucide-react';
 import { catLabel, categoriesOf, exampleItems } from './data.js';
 import {
@@ -10,6 +10,7 @@ import {
 import {
   fetchDoc, isValidCode, loginAccount, lockEditing, newKitchenCode, registerAccount, resetPassword, saveDoc, watchAuth, watchDoc, withTimeout,
 } from './sync.js';
+import CategoryIcon from './components/CategoryIcon.jsx';
 import ItemCard from './components/ItemCard.jsx';
 import EditModal from './components/EditModal.jsx';
 import ImportModal from './components/ImportModal.jsx';
@@ -29,15 +30,23 @@ const CODE_KEY = 'kitchen-inventory:code';
 // Personal accounts need the matching Firestore rules; set VITE_ACCOUNTS=0 to switch them off.
 const ACCOUNTS_ENABLED = import.meta.env.VITE_ACCOUNTS !== '0';
 
-function StatCard({ icon: Icon, label, value, tone }) {
+const TONES = {
+  info: 'bg-info-soft text-info-text',
+  warning: 'bg-warning-soft text-warning-text',
+  danger: 'bg-danger-soft text-danger-text',
+  success: 'bg-success-soft text-success-text',
+};
+
+// `muted`: a zero in an alert card fades to grey; color returns as soon as there is something to act on.
+function StatCard({ icon: Icon, label, value, tone, muted = false }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl bg-white/80 p-3 shadow-sm ring-1 ring-black/5 backdrop-blur sm:gap-4 sm:p-5">
-      <div className={`hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl sm:flex ${tone}`}>
-        <Icon size={24} />
+    <div className="card flex min-w-0 flex-col gap-3 p-4 sm:flex-row sm:items-center sm:gap-4 sm:p-5">
+      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-control sm:h-11 sm:w-11 ${muted ? 'bg-tint text-ink-3' : TONES[tone]}`}>
+        <Icon size={22} aria-hidden="true" />
       </div>
-      <div>
-        <div className="text-2xl font-extrabold leading-none sm:text-3xl">{value}</div>
-        <div className="mt-1 text-xs text-stone-500 sm:text-sm">{label}</div>
+      <div className="min-w-0">
+        <div className={`t-stat ${muted ? 'text-ink-3' : ''}`}>{value}</div>
+        <div className="t-meta mt-1.5 leading-snug">{label}</div>
       </div>
     </div>
   );
@@ -63,6 +72,7 @@ export default function App() {
   const [showSync, setShowSync] = useState(false);
   const [showUnlock, setShowUnlock] = useState(false);
   const [showOrder, setShowOrder] = useState(false);
+  const [theme, setTheme] = useState(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'));
   const [authUser, setAuthUser] = useState(null);
   const [accountUser, setAccountUser] = useState(null);
   const accountFlow = useRef(false);
@@ -79,6 +89,12 @@ export default function App() {
   useEffect(() => save(APPLIED_KEY, applied), [applied]);
   useEffect(() => save(VIEW_KEY, view), [view]);
 
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.classList.toggle('dark', next === 'dark');
+    try { localStorage.setItem('kitchen-inventory:theme', next); } catch { /* storage unavailable */ }
+    setTheme(next);
+  };
   const isEditor = !!authUser?.isEditor;
   useEffect(() => watchAuth((u) => {
     setAuthUser(u);
@@ -280,108 +296,106 @@ export default function App() {
 
   const tabBtn = (id, Icon, text, badge) => (
     <button
+      role="tab"
+      aria-selected={tab === id}
       onClick={() => setTab(id)}
-      className={`flex items-center gap-2 rounded-xl px-5 py-2.5 font-bold transition ${
-        tab === id ? 'bg-stone-900 text-white shadow' : 'bg-white/70 text-stone-600 hover:bg-white'
-      }`}
+      className="seg"
     >
-      <Icon size={18} /> {text}
-      {badge > 0 && <span className="rounded-full bg-rose-500 px-2 text-xs text-white">{badge}</span>}
+      <Icon size={18} aria-hidden="true" /> {text}
+      {badge > 0 && <span className="rounded-full bg-danger px-2 py-0.5 text-xs font-semibold text-on-solid">{badge}</span>}
     </button>
   );
 
   const grid = (list) => (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {list.map((i) => <ItemCard key={i.id} item={i} rhythm={rhythms.get(i.name)} onAdjust={adjust} onDelete={remove} onToggleMute={toggleMute} onSetQty={setQty} onEdit={(id) => (readOnly ? setShowUnlock(true) : setEditingId(id))} onSetMin={setMin} />)}
     </div>
   );
 
+  const syncLabel = syncStatus === 'off' ? 'התחברות' : syncStatus === 'error' ? 'לא מחובר' : syncStatus === 'syncing' ? 'מתחבר…' : 'מחובר';
+  const SyncIcon = syncStatus === 'off' ? CloudOff : Cloud;
+  const syncTone = syncStatus === 'error' ? 'text-danger-text' : syncStatus === 'syncing' ? 'text-warning-text' : syncStatus === 'ok' ? 'text-success-text' : 'text-ink-3';
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+      <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-rose-500 text-white shadow-lg">
-            <ChefHat size={30} />
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-card bg-gradient-to-br from-primary to-brand-end text-on-solid shadow-card">
+            <ChefHat size={26} aria-hidden="true" />
           </div>
-          <div>
-            <h1 className="text-3xl font-extrabold">מלאי המטבח</h1>
-            <p className="text-stone-500">כל מה שיש במטבח, במבט אחד</p>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h1 className="t-title">מלאי המטבח</h1>
+              {code && isEditor && (
+                <button onClick={() => lockEditing()} title="לחץ כדי לנעול את העריכה" className="badge hit bg-success-soft text-success-text">
+                  <LockOpen size={12} aria-hidden="true" /> מצב עריכה · נעל
+                </button>
+              )}
+            </div>
+            <p className="t-meta">כל מה שיש במטבח, במבט אחד</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowSync(true)}
-            className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 font-bold shadow-sm ring-1 ring-black/5 transition hover:bg-stone-50"
-          >
-            {syncStatus === 'off'
-              ? <CloudOff size={20} className="text-stone-400" />
-              : <Cloud size={20} className={syncStatus === 'error' ? 'text-red-500' : syncStatus === 'syncing' ? 'text-amber-500' : 'text-emerald-500'} />}
-            {syncStatus === 'off' ? 'התחברות' : syncStatus === 'error' ? 'לא מחובר' : syncStatus === 'syncing' ? 'מתחבר…' : 'מחובר'}
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={guard(() => setShowAdd(true))} className="btn-brand">
+            <Plus size={18} aria-hidden="true" /> פריט חדש
+          </button>
+          <button onClick={guard(() => setShowImport(true))} className="btn-secondary">
+            <FileSpreadsheet size={18} aria-hidden="true" /> ייבוא מאקסל
+          </button>
+          <button onClick={exportExcel} className="btn-secondary">
+            <Download size={18} aria-hidden="true" /> ייצוא לאקסל
+          </button>
+          <button onClick={() => setShowSync(true)} className="btn-secondary">
+            <SyncIcon size={18} className={syncTone} aria-hidden="true" /> {syncLabel}
           </button>
           <button
-            onClick={exportExcel}
-            className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 font-bold shadow-sm ring-1 ring-black/5 transition hover:bg-stone-50"
+            onClick={toggleTheme}
+            aria-label={theme === 'dark' ? 'מעבר למצב בהיר' : 'מעבר למצב כהה'}
+            title={theme === 'dark' ? 'מצב בהיר' : 'מצב כהה'}
+            className="btn-secondary w-11 px-0"
           >
-            <Download size={20} className="text-sky-600" /> ייצוא לאקסל
-          </button>
-          <button
-            onClick={guard(() => setShowImport(true))}
-            className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 font-bold shadow-sm ring-1 ring-black/5 transition hover:bg-stone-50"
-          >
-            <FileSpreadsheet size={20} className="text-emerald-600" /> ייבוא מאקסל
-          </button>
-          <button
-            onClick={guard(() => setShowAdd(true))}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-l from-orange-500 to-rose-500 px-5 py-3 font-bold text-white shadow-lg transition hover:scale-105"
-          >
-            <Plus size={20} /> פריט חדש
+            {theme === 'dark' ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
           </button>
         </div>
       </header>
 
       {readOnly && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-50 p-4 text-amber-800 ring-1 ring-amber-200">
-          <span className="flex items-center gap-2"><Lock size={18} /> מצב צפייה בלבד. לעריכה יש להזין סיסמה.</span>
-          <button onClick={() => setShowUnlock(true)} className="rounded-xl bg-amber-500 px-4 py-2 font-bold text-white hover:bg-amber-600">הזן סיסמה</button>
-        </div>
-      )}
-      {code && isEditor && (
-        <div className="mb-6 flex items-center justify-between gap-3 rounded-2xl bg-emerald-50 p-3 text-sm text-emerald-700">
-          <span className="flex items-center gap-2"><LockOpen size={16} /> מצב עריכה פעיל במכשיר זה</span>
-          <button onClick={() => lockEditing()} className="font-bold underline">נעל</button>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-card border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-text">
+          <span className="flex items-center gap-2"><Lock size={16} aria-hidden="true" /> מצב צפייה בלבד. לעריכה יש להזין סיסמה.</span>
+          <button onClick={() => setShowUnlock(true)} className="btn-ink">הזן סיסמה</button>
         </div>
       )}
 
       {items.some((i) => i.example) && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sky-50 p-4 text-sky-800 ring-1 ring-sky-200">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-card border border-info/30 bg-info-soft px-4 py-3 text-sm text-info-text">
           <span>אלה מוצרי דוגמה כדי שתראה איך זה עובד. אפשר לייבא קובץ אקסל משלך או להוסיף מוצרים, ולמחוק את הדוגמאות.</span>
-          <span className="flex gap-2">
-            <button onClick={() => setShowImport(true)} className="rounded-xl bg-sky-600 px-4 py-2 font-bold text-white hover:bg-sky-700">ייבוא מאקסל</button>
-            <button onClick={clearExamples} className="rounded-xl bg-white px-4 py-2 font-bold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-100">מחק דוגמאות</button>
+          <span className="flex flex-wrap gap-2">
+            <button onClick={() => setShowImport(true)} className="btn-ink">ייבוא מאקסל</button>
+            <button onClick={clearExamples} className="btn-secondary">מחק דוגמאות</button>
           </span>
         </div>
       )}
       {items.length === 0 && (
-        <section className="mb-8 rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
-          <ChefHat size={48} className="mx-auto mb-3 text-orange-400" />
-          <h2 className="mb-2 text-2xl font-extrabold">ברוכים הבאים למלאי המטבח</h2>
-          <p className="mx-auto mb-5 max-w-md text-stone-600">עדיין אין כאן מוצרים. אפשר להעלות קובץ אקסל והמערכת תיצור הכול לבד, להוסיף מוצר ידנית, או להתחבר למטבח משותף עם קוד.</p>
+        <section className="card mb-8 p-8 text-center">
+          <ChefHat size={44} className="mx-auto mb-3 text-primary" aria-hidden="true" />
+          <h2 className="t-section mb-2">ברוכים הבאים למלאי המטבח</h2>
+          <p className="mx-auto mb-5 max-w-md text-ink-2">עדיין אין כאן מוצרים. אפשר להעלות קובץ אקסל והמערכת תיצור הכול לבד, להוסיף מוצר ידנית, או להתחבר למטבח משותף עם קוד.</p>
           <div className="flex flex-wrap justify-center gap-3">
-            <button onClick={() => setShowImport(true)} className="flex items-center gap-2 rounded-xl bg-gradient-to-l from-orange-500 to-rose-500 px-5 py-3 font-bold text-white shadow-lg"><FileSpreadsheet size={20} /> ייבוא מאקסל</button>
-            <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-xl bg-stone-100 px-5 py-3 font-bold hover:bg-stone-200"><Plus size={20} /> הוספת מוצר ידנית</button>
-            <button onClick={() => setShowSync(true)} className="flex items-center gap-2 rounded-xl bg-stone-100 px-5 py-3 font-bold hover:bg-stone-200"><Cloud size={20} /> התחברות עם קוד</button>
+            <button onClick={() => setShowImport(true)} className="btn-primary"><FileSpreadsheet size={18} aria-hidden="true" /> ייבוא מאקסל</button>
+            <button onClick={() => setShowAdd(true)} className="btn-secondary"><Plus size={18} aria-hidden="true" /> הוספת מוצר ידנית</button>
+            <button onClick={() => setShowSync(true)} className="btn-secondary"><Cloud size={18} aria-hidden="true" /> התחברות עם קוד</button>
           </div>
         </section>
       )}
 
-      <section className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard icon={Package} label="סה״כ פריטים" value={items.length} tone="bg-sky-100 text-sky-600" />
-        <StatCard icon={AlertTriangle} label="לחידוש (מתחת למינימום)" value={lowItems.length} tone="bg-amber-100 text-amber-600" />
-        <StatCard icon={CalendarClock} label="עומדים לפוג / פגו תוקף" value={expiringCount} tone="bg-red-100 text-red-600" />
-        <StatCard icon={Wallet} label="שווי מלאי מוערך" value={money(totalValue)} tone="bg-emerald-100 text-emerald-600" />
+      <section className="mb-8 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 sm:gap-4 lg:grid-cols-4" aria-label="סיכום מלאי">
+        <StatCard icon={Package} label="סה״כ פריטים" value={items.length} tone="info" />
+        <StatCard icon={AlertTriangle} label="לחידוש (מתחת למינימום)" value={lowItems.length} tone="warning" muted={lowItems.length === 0} />
+        <StatCard icon={CalendarClock} label="עומדים לפוג / פגו תוקף" value={expiringCount} tone="danger" muted={expiringCount === 0} />
+        <StatCard icon={Wallet} label="שווי מלאי מוערך" value={money(totalValue)} tone="success" />
       </section>
 
-      <nav className="mb-6 flex flex-wrap gap-2">
+      <nav className="mb-6 flex flex-wrap gap-2" role="tablist" aria-label="אזורי המערכת">
         {tabBtn('inventory', LayoutGrid, 'מלאי', 0)}
         {tabBtn('shopping', ShoppingCart, 'רשימת קניות', lowItems.length)}
         {tabBtn('history', History, 'היסטוריית הזמנות', 0)}
@@ -389,68 +403,49 @@ export default function App() {
 
       {tab === 'inventory' && (
         <>
-          <div className="mb-4 flex flex-wrap gap-2">
-            {[{ id: 'all', label: 'הכל', emoji: '🍽️' }, ...categories].map((c) => {
+          <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="סינון לפי קטגוריה">
+            {[{ id: 'all', label: 'הכל' }, ...categories].map((c) => {
               const count = c.id === 'all' ? items.length : items.filter((i) => i.category === c.id).length;
               return (
-                <button
-                  key={c.id}
-                  onClick={() => setCategory(c.id)}
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                    category === c.id ? 'bg-orange-500 text-white shadow' : 'bg-white text-stone-600 ring-1 ring-black/5 hover:bg-orange-50'
-                  }`}
-                >
-                  {c.emoji} {c.label} <span className="opacity-60">({count})</span>
+                <button key={c.id} onClick={() => setCategory(c.id)} aria-pressed={category === c.id} className="seg">
+                  <CategoryIcon id={c.id} label={c.label} size={16} /> {c.label} <span className="font-normal opacity-75">({count})</span>
                 </button>
               );
             })}
-            <button
-              onClick={() => setOnlyMuted((v) => !v)}
-              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium transition ${
-                onlyMuted ? 'bg-amber-500 text-white shadow' : 'bg-white text-stone-600 ring-1 ring-black/5 hover:bg-amber-50'
-              }`}
-            >
-              <BellOff size={14} /> מושתקים ({items.filter((i) => i.muted).length})
+            <button onClick={() => setOnlyMuted((v) => !v)} aria-pressed={onlyMuted} className="seg">
+              <BellOff size={16} aria-hidden="true" /> מושתקים <span className="font-normal opacity-75">({items.filter((i) => i.muted).length})</span>
             </button>
           </div>
 
           <div className="mb-6 flex flex-wrap gap-3">
             <div className="relative min-w-[220px] flex-1">
-              <Search size={18} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-stone-400" />
+              <Search size={18} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-3" aria-hidden="true" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="חיפוש לפי שם פריט…"
-                className="w-full rounded-xl border-0 bg-white py-3 pl-3 pr-10 shadow-sm ring-1 ring-black/5 outline-none focus:ring-2 focus:ring-orange-300"
+                aria-label="חיפוש לפי שם פריט"
+                className="field h-12 pr-11"
               />
             </div>
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              aria-label="מיון"
-              className="rounded-xl border-0 bg-white px-4 py-3 shadow-sm ring-1 ring-black/5 outline-none focus:ring-2 focus:ring-orange-300"
-            >
+            <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="מיון" className="field h-12 w-auto">
               <option value="name">מיון: לפי א׳־ב׳</option>
               <option value="quantity">מיון: לפי כמות (מהנמוכה)</option>
               <option value="shortage">מיון: לפי חוסר (הדחוף ראשון)</option>
               <option value="expiry">מיון: לפי תאריך תפוגה</option>
             </select>
-            <div className="flex overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5">
+            <div className="flex gap-2" role="group" aria-label="תצוגה">
               {[['grouped', Rows3, 'לפי קטגוריות'], ['grid', Grid3x3, 'כל הפריטים']].map(([id, Icon, text]) => (
-                <button
-                  key={id}
-                  onClick={() => setView(id)}
-                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition ${view === id ? 'bg-stone-900 text-white' : 'hover:bg-stone-50'}`}
-                >
-                  <Icon size={16} /> {text}
+                <button key={id} onClick={() => setView(id)} aria-pressed={view === id} className="seg h-12">
+                  <Icon size={16} aria-hidden="true" /> {text}
                 </button>
               ))}
             </div>
           </div>
 
           {visible.length === 0 ? (
-            <div className="rounded-2xl bg-white/70 py-16 text-center text-stone-500">
-              <Package size={48} className="mx-auto mb-3 text-stone-300" />
+            <div className="card py-16 text-center text-ink-3">
+              <Package size={44} className="mx-auto mb-3 text-line-strong" aria-hidden="true" />
               לא נמצאו פריטים
             </div>
           ) : view === 'grid' ? (
@@ -460,17 +455,17 @@ export default function App() {
               {sections.map((c) => {
                 const expanded = openGroups.includes(c.id) || !!query.trim() || category !== 'all';
                 return (
-                  <div key={c.id} className="rounded-3xl bg-white/60 p-3 ring-1 ring-black/5">
-                    <button onClick={() => toggleGroup(c.id)} className="flex w-full items-center gap-3 rounded-2xl p-3 text-right hover:bg-white/80">
-                      <span className="text-2xl">{c.emoji}</span>
-                      <span className="flex-1">
-                        <span className="block text-lg font-extrabold">{c.label}</span>
-                        <span className="text-sm text-stone-500">{c.list.length} פריטים{c.value > 0 ? ` · שווי ${money(c.value)}` : ''}</span>
+                  <div key={c.id} className="rounded-card border border-line bg-surface/60 p-2 sm:p-3">
+                    <button onClick={() => toggleGroup(c.id)} aria-expanded={expanded} className="flex min-h-14 w-full items-center gap-3 rounded-control p-2 text-right transition hover:bg-surface">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-control bg-tint text-ink-2"><CategoryIcon id={c.id} label={c.label} size={20} /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="t-section block">{c.label}</span>
+                        <span className="t-meta">{c.list.length} פריטים{c.value > 0 ? ` · שווי ${money(c.value)}` : ''}</span>
                       </span>
-                      {c.low > 0 && <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">{c.low} לחידוש</span>}
-                      {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                      {c.low > 0 && <span className="badge bg-danger-soft text-danger-text">{c.low} לחידוש</span>}
+                      {expanded ? <ChevronUp size={20} aria-hidden="true" /> : <ChevronDown size={20} aria-hidden="true" />}
                     </button>
-                    {expanded && <div className="p-3 pt-1">{grid(c.list)}</div>}
+                    {expanded && <div className="p-2 pt-1 sm:p-3">{grid(c.list)}</div>}
                   </div>
                 );
               })}
@@ -480,42 +475,42 @@ export default function App() {
       )}
 
       {tab === 'shopping' && (
-        <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-black/5">
+        <section className="card p-4 sm:p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-extrabold">מה צריך לקנות ({lowItems.length})</h2>
+            <h2 className="t-section">מה צריך לקנות ({lowItems.length})</h2>
             <div className="flex flex-wrap gap-2">
               {shoppingChecked.length > 0 && (
-                <button onClick={restockChecked} className="flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 font-bold text-white shadow hover:bg-emerald-600">
-                  <PackageCheck size={18} /> קניתי – עדכן מלאי ({shoppingChecked.length})
+                <button onClick={restockChecked} className="btn-ink">
+                  <PackageCheck size={18} aria-hidden="true" /> קניתי – עדכן מלאי ({shoppingChecked.length})
                 </button>
               )}
               {lowItems.length > 0 && (
-                <button onClick={() => setShowOrder(true)} className="flex items-center gap-2 rounded-xl bg-gradient-to-l from-orange-500 to-rose-500 px-4 py-2 font-bold text-white shadow hover:opacity-90">
-                  <FileText size={18} /> הפק רשימת הזמנה
+                <button onClick={() => setShowOrder(true)} className="btn-primary">
+                  <FileText size={18} aria-hidden="true" /> הפק רשימת הזמנה
                 </button>
               )}
             </div>
           </div>
           {lowItems.length === 0 ? (
-            <div className="py-12 text-center text-stone-500">
-              <CheckCircle2 size={48} className="mx-auto mb-3 text-emerald-400" />
-              המלאי מלא, אין מה לקנות 🎉
+            <div className="py-12 text-center text-ink-3">
+              <CheckCircle2 size={44} className="mx-auto mb-3 text-success" aria-hidden="true" />
+              המלאי מלא, אין מה לקנות
             </div>
           ) : (
-            <ul className="divide-y divide-stone-100">
+            <ul className="divide-y divide-line">
               {lowItems.map((i) => {
                 const done = checked.includes(i.id);
                 const st = STATUS[stockStatus(i)];
                 return (
                   <li key={i.id}>
-                    <button onClick={() => toggleCheck(i.id)} className="flex w-full items-center gap-3 py-3 text-right transition hover:bg-stone-50">
-                      {done ? <CheckCircle2 className="shrink-0 text-emerald-500" /> : <Circle className="shrink-0 text-stone-300" />}
-                      <span className={`min-w-0 flex-1 font-medium ${done ? 'text-stone-400 line-through' : ''}`}>
+                    <button onClick={() => toggleCheck(i.id)} aria-pressed={done} className="flex min-h-14 w-full items-center gap-3 py-2 text-right transition hover:bg-subtle">
+                      {done ? <CheckCircle2 className="shrink-0 text-success" aria-hidden="true" /> : <Circle className="shrink-0 text-line-strong" aria-hidden="true" />}
+                      <span className={`min-w-0 flex-1 font-medium ${done ? 'text-ink-3 line-through' : ''}`}>
                         {i.name}
-                        <span className="mr-2 text-sm font-normal text-stone-400">{catLabel(i.category).label}{i.supplier ? ` · ${i.supplier}` : ''}</span>
+                        <span className="t-meta mr-2 font-normal">{catLabel(i.category).label}{i.supplier ? ` · ${i.supplier}` : ''}</span>
                       </span>
-                      <span className="hidden text-sm text-stone-500 sm:inline">יש {i.quantity} · מינימום {i.lowThreshold}</span>
-                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${st.badge}`}>{st.label}</span>
+                      <span className="t-meta hidden sm:inline">יש {i.quantity} · מינימום {i.lowThreshold}</span>
+                      <span className={`badge ${st.badge}`}>{st.label}</span>
                     </button>
                   </li>
                 );
@@ -526,7 +521,6 @@ export default function App() {
       )}
 
       {tab === 'history' && <OrdersHistory orders={orders} onDeleteOrder={deleteOrderRow} />}
-
 
       {showSync && (
         <SyncModal code={code} status={syncStatus} accountUser={accountUser} accountsEnabled={ACCOUNTS_ENABLED}

@@ -1,17 +1,15 @@
 export const CATEGORIES = [
-  { id: 'dry', label: 'יבשים', emoji: '🌾' },
-  { id: 'shamai', label: 'ר. שמאי', emoji: '🧹' },
-  { id: 'salads', label: 'סלטים', emoji: '🥗' },
-  { id: 'frozen', label: 'קפואים', emoji: '🍟' },
+  { id: 'dry', label: 'יבשים' },
+  { id: 'shamai', label: 'ר. שמאי' },
+  { id: 'salads', label: 'סלטים' },
+  { id: 'frozen', label: 'קפואים' },
 ];
 
 export const UNITS = ['יח׳', 'ק״ג', 'גרם', 'ליטר', 'מ״ל', 'חבילות', 'בקבוקים', 'קופסאות'];
 
-const GENERIC_EMOJI = '📦';
-
-// Known categories keep their emoji; any other id is shown as its own text.
+// Known categories get their Hebrew label; any other id is shown as its own text.
 export const catLabel = (id) =>
-  CATEGORIES.find((c) => c.id === id) || { id, label: id || 'כללי', emoji: GENERIC_EMOJI };
+  CATEGORIES.find((c) => c.id === id) || { id, label: id || 'כללי' };
 
 export const categoryIdFromLabel = (text) => {
   const t = (text || '').trim();
