@@ -3,7 +3,7 @@ import {
   Package, AlertTriangle, CalendarClock, Plus, Search, ShoppingCart, LayoutGrid, CheckCircle2, Circle,
   ChefHat, PackageCheck, FileSpreadsheet, Download, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet, BellOff, Moon, Sun,
 } from 'lucide-react';
-import { catLabel, categoriesOf, exampleItems } from './data.js';
+import { catLabel, categoriesOf } from './data.js';
 import {
   daysUntil, downloadBlob, EXPIRY_SOON_DAYS, load, money, needsOrder, normalizeState, orderStats, qtyOf, save, STATUS, stockStatus, stockValue, todayIso,
 } from './lib.js';
@@ -53,7 +53,7 @@ function StatCard({ icon: Icon, label, value, tone, muted = false }) {
 }
 
 export default function App() {
-  const [items, setItems] = useState(() => load(ITEMS_KEY, null) ?? exampleItems());
+  const [items, setItems] = useState(() => load(ITEMS_KEY, []));
   // Ids of one-time updates applied by earlier versions; kept as is so that older open tabs never repeat them.
   const [applied, setApplied] = useState(() => load(APPLIED_KEY, []));
   const [removedOrders, setRemovedOrders] = useState(() => load(REMOVED_KEY, []));
@@ -291,6 +291,8 @@ export default function App() {
     [visible, categories],
   );
 
+  // Small inventories start with every category open; larger ones start collapsed. A click flips either default.
+  const smallInventory = items.length <= 12;
   const toggleGroup = (id) => setOpenGroups((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const shoppingChecked = lowItems.filter((i) => checked.includes(i.id));
 
@@ -453,7 +455,7 @@ export default function App() {
           ) : (
             <div className="space-y-4">
               {sections.map((c) => {
-                const expanded = openGroups.includes(c.id) || !!query.trim() || category !== 'all';
+                const expanded = !!query.trim() || category !== 'all' || smallInventory !== openGroups.includes(c.id);
                 return (
                   <div key={c.id} className="rounded-card border border-line bg-surface/60 p-2 sm:p-3">
                     <button onClick={() => toggleGroup(c.id)} aria-expanded={expanded} className="flex min-h-14 w-full items-center gap-3 rounded-control p-2 text-right transition hover:bg-surface">
