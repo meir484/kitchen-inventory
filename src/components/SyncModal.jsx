@@ -31,14 +31,14 @@ export default function SyncModal({ code, status, accountUser, accountsEnabled, 
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-xl font-extrabold"><Cloud size={22} /> סנכרון בין מכשירים</h2>
+          <h2 className="flex items-center gap-2 text-xl font-extrabold"><Cloud size={22} /> {accountUser || code ? 'החשבון שלי' : 'התחברות'}</h2>
           <button onClick={onClose} aria-label="סגור" className="rounded-full p-2 hover:bg-stone-100"><X size={20} /></button>
         </div>
 
         {accountUser ? (
           <>
             <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-emerald-700">
-              {status === 'error' ? 'אין חיבור כרגע. השינויים יסונכרנו כשהחיבור יחזור.' : 'המלאי מסונכרן ושמור בענן. כל שינוי יופיע בכל מכשיר שתתחבר אליו.'}
+              {status === 'error' ? 'אין חיבור כרגע. השינויים יסונכרנו כשהחיבור יחזור.' : 'מחובר. המלאי שמור בענן וכל שינוי יופיע בכל מכשיר שתתחבר אליו.'}
             </p>
             <div className="mb-4 flex items-center gap-2 rounded-xl bg-stone-50 p-3" dir="ltr"><UserRound size={18} className="shrink-0 text-stone-400" /><span className="truncate">{accountUser.email}</span></div>
             <p className="mb-5 text-xs text-stone-500">המלאי פרטי ונראה רק לך. כדי לראות אותו במכשיר אחר, התחבר שם עם אותו אימייל וסיסמה.</p>
@@ -49,7 +49,7 @@ export default function SyncModal({ code, status, accountUser, accountsEnabled, 
         ) : code ? (
           <>
             <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-emerald-700">
-              {status === 'error' ? 'אין חיבור כרגע. השינויים יסונכרנו כשהחיבור יחזור.' : 'המלאי מסונכרן. כל שינוי יופיע בכל המכשירים המחוברים.'}
+              {status === 'error' ? 'אין חיבור כרגע. השינויים יסונכרנו כשהחיבור יחזור.' : 'מחובר. כל שינוי יופיע בכל המכשירים המחוברים.'}
             </p>
             <label className="mb-1 block text-sm font-medium text-stone-600">קישור לחיבור מכשיר נוסף</label>
             <div className="mb-3 flex gap-2">
@@ -63,7 +63,7 @@ export default function SyncModal({ code, status, accountUser, accountsEnabled, 
             </div>
             <p className="mb-5 text-xs text-stone-500">מי שמחזיק בקישור או בקוד יכול לראות ולערוך את המלאי. שתף רק עם בני הבית.</p>
             <button onClick={() => { onLeave(); onClose(); }} className={`${btn} flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-100`}>
-              <CloudOff size={16} /> נתק מכשיר זה מהסנכרון
+              <CloudOff size={16} /> התנתק במכשיר זה
             </button>
           </>
         ) : (

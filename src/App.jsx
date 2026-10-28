@@ -318,7 +318,7 @@ export default function App() {
             {syncStatus === 'off'
               ? <CloudOff size={20} className="text-stone-400" />
               : <Cloud size={20} className={syncStatus === 'error' ? 'text-red-500' : syncStatus === 'syncing' ? 'text-amber-500' : 'text-emerald-500'} />}
-            {syncStatus === 'off' ? 'סנכרון' : syncStatus === 'error' ? 'לא מחובר' : syncStatus === 'syncing' ? 'מסנכרן…' : 'מסונכרן'}
+            {syncStatus === 'off' ? 'התחברות' : syncStatus === 'error' ? 'לא מחובר' : syncStatus === 'syncing' ? 'מתחבר…' : 'מחובר'}
           </button>
           <button
             onClick={exportExcel}
