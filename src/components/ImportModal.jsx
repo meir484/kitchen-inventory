@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Download, FileSpreadsheet, Upload, X } from 'lucide-react';
 import { parseWorkbook, planImport, templateRows } from '../importExcel.js';
+import { downloadBlob } from '../lib.js';
 
 const KIND = { items: 'מוצרים', orders: 'יומן הזמנות', skipped: 'דולג (לא זוהו עמודות)' };
 
@@ -41,14 +42,7 @@ export default function ImportModal({ items, orders, onClose, onApply }) {
       sheet: 'מוצרים',
       columns: [26, 14, 12, 14, 10, 18, 14, 16].map((width) => ({ width })),
     }).toBlob();
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'inventory-template.xlsx';
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadBlob(blob, 'inventory-template.xlsx');
   };
 
   const plan = parsed ? planImport(items, orders, parsed, { mode, includeOrders }) : null;

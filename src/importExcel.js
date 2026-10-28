@@ -153,7 +153,8 @@ export function parseWorkbook(sheets, now = Date.now()) {
 const sameName = (a, b) => normText(a).toLowerCase() === normText(b).toLowerCase();
 
 // mode 'merge': update matching items (by name) and add new ones. mode 'replace': use the file as is.
-export function planImport(currentItems, currentOrders, parsed, { mode, includeOrders }) {
+export function planImport(allItems, currentOrders, parsed, { mode, includeOrders }) {
+  const currentItems = allItems.filter((i) => !i.example);
   const incoming = parsed.items.map(({ hasMin, ...item }) => ({ ...item, hasMin }));
   let items;
   let added = 0;

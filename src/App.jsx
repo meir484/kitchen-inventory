@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Package, AlertTriangle, CalendarClock, Plus, Search, ShoppingCart, LayoutGrid, CheckCircle2, Circle,
-  ChefHat, PackageCheck, FileSpreadsheet, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet, BellOff,
+  ChefHat, PackageCheck, FileSpreadsheet, Download, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet, BellOff,
 } from 'lucide-react';
-import { catLabel, categoriesOf, mergeSeedOrders } from './data.js';
+import { catLabel, categoriesOf, exampleItems, mergeSeedOrders } from './data.js';
 import {
-  daysUntil, EXPIRY_SOON_DAYS, load, money, needsOrder, normalizeState, orderStats, qtyOf, save, STATUS, stockStatus, stockValue,
+  daysUntil, downloadBlob, EXPIRY_SOON_DAYS, load, money, needsOrder, normalizeState, orderStats, qtyOf, save, STATUS, stockStatus, stockValue, todayIso,
 } from './lib.js';
 import {
-  fetchKitchen, isValidCode, lockEditing, newKitchenCode, saveKitchen, watchEditor, watchKitchen, withTimeout,
+  fetchDoc, isValidCode, loginAccount, lockEditing, newKitchenCode, registerAccount, resetPassword, saveDoc, watchAuth, watchDoc, withTimeout,
 } from './sync.js';
 import { runMigrations } from './migrations.js';
 import ItemCard from './components/ItemCard.jsx';
@@ -27,6 +27,8 @@ const REMOVED_KEY = 'kitchen-inventory:v2:removedOrders';
 const CHECKED_KEY = 'kitchen-inventory:v2:checked';
 const VIEW_KEY = 'kitchen-inventory:v2:view';
 const CODE_KEY = 'kitchen-inventory:code';
+// Personal accounts stay off until the matching Firestore rules are published.
+const ACCOUNTS_ENABLED = import.meta.env.VITE_ACCOUNTS === '1';
 
 function StatCard({ icon: Icon, label, value, tone }) {
   return (
@@ -43,7 +45,7 @@ function StatCard({ icon: Icon, label, value, tone }) {
 }
 
 export default function App() {
-  const [boot] = useState(() => runMigrations(load(ITEMS_KEY, []), load(APPLIED_KEY, [])));
+  const [boot] = useState(() => runMigrations(load(ITEMS_KEY, null) ?? exampleItems(), load(APPLIED_KEY, [])));
   const [items, setItems] = useState(boot.items);
   const [applied, setApplied] = useState(boot.applied);
   const [removedOrders, setRemovedOrders] = useState(() => load(REMOVED_KEY, []));
@@ -62,7 +64,9 @@ export default function App() {
   const [showSync, setShowSync] = useState(false);
   const [showUnlock, setShowUnlock] = useState(false);
   const [showOrder, setShowOrder] = useState(false);
-  const [isEditor, setIsEditor] = useState(false);
+  const [authUser, setAuthUser] = useState(null);
+  const [accountUser, setAccountUser] = useState(null);
+  const accountFlow = useRef(false);
   const [code, setCode] = useState(() => load(CODE_KEY, ''));
   const [syncStatus, setSyncStatus] = useState('off');
   const lastRemote = useRef('');
@@ -76,8 +80,14 @@ export default function App() {
   useEffect(() => save(APPLIED_KEY, applied), [applied]);
   useEffect(() => save(VIEW_KEY, view), [view]);
 
-  useEffect(() => watchEditor(setIsEditor), []);
+  const isEditor = !!authUser?.isEditor;
+  useEffect(() => watchAuth((u) => {
+    setAuthUser(u);
+    if (!accountFlow.current) setAccountUser(ACCOUNTS_ENABLED && u && !u.isEditor ? u : null);
+  }), []);
   const readOnly = !!code && !isEditor;
+  const syncPath = code ? `kitchens/${code}` : accountUser ? `users/${accountUser.uid}` : '';
+  const canWrite = code ? isEditor : !!accountUser;
   const guard = (fn) => (...a) => (readOnly ? setShowUnlock(true) : fn(...a));
 
   const applyRemote = (data) => {
@@ -91,14 +101,15 @@ export default function App() {
     setRemovedOrders(next.removedOrders);
   };
 
+  useEffect(() => save(CODE_KEY, code), [code]);
+
   useEffect(() => {
-    save(CODE_KEY, code);
     writesReady.current = false;
     unsynced.current = false;
-    if (!code) { setSyncStatus('off'); return undefined; }
+    if (!syncPath) { setSyncStatus('off'); return undefined; }
     setSyncStatus('syncing');
-    return watchKitchen(
-      code,
+    return watchDoc(
+      syncPath,
       (data) => {
         const first = !writesReady.current;
         if (data && data.payload !== lastRemote.current && (first || !unsynced.current)) applyRemote(data);
@@ -106,27 +117,29 @@ export default function App() {
         setSyncStatus('ok');
       },
       () => setSyncStatus('error'),
+      { signed: !code },
     );
-  }, [code]);
+  }, [syncPath]);
 
   useEffect(() => {
-    if (!code || !isEditor || !writesReady.current) return undefined;
+    if (!syncPath || !canWrite || !writesReady.current) return undefined;
     const payload = JSON.stringify({ items, checked, orders, removedOrders, appliedMigrations: applied });
     if (payload === lastRemote.current) return undefined;
     unsynced.current = true;
     const t = setTimeout(() => {
       lastRemote.current = payload;
-      saveKitchen(code, { payload })
+      saveDoc(syncPath, { payload })
         .then(() => setSyncStatus('ok'))
         .catch(() => setSyncStatus('error'))
         .finally(() => { unsynced.current = false; });
     }, 500);
     return () => clearTimeout(t);
-  }, [items, checked, orders, removedOrders, applied, code, isEditor]);
+  }, [items, checked, orders, removedOrders, applied, syncPath, canWrite]);
 
   const joinKitchen = async (raw) => {
     if (!isValidCode(raw)) throw new Error('הקוד אינו תקין');
-    const data = await fetchKitchen(raw).catch(() => { throw new Error('אין חיבור לשרת, נסה שוב'); });
+    if (accountUser) throw new Error('התנתק מהחשבון האישי לפני חיבור למטבח משותף');
+    const data = await fetchDoc(`kitchens/${raw}`).catch(() => { throw new Error('אין חיבור לשרת, נסה שוב'); });
     if (!data) throw new Error('לא נמצא מטבח עם הקוד הזה');
     applyRemote(data);
     setCode(raw);
@@ -138,12 +151,39 @@ export default function App() {
     }
     const fresh = newKitchenCode();
     const payload = JSON.stringify({ items, checked, orders, removedOrders, appliedMigrations: applied });
-    await withTimeout(saveKitchen(fresh, { payload }), 15000, 'השרת לא הגיב. בדוק חיבור לאינטרנט (חלק מהסינונים חוסמים את השירות) ונסה שוב')
+    await withTimeout(saveDoc(`kitchens/${fresh}`, { payload }), 15000, 'השרת לא הגיב. בדוק חיבור לאינטרנט (חלק מהסינונים חוסמים את השירות) ונסה שוב')
       .catch((e) => {
         throw new Error(e.code === 'permission-denied' ? 'אין הרשאה לשמור. הזן שוב את סיסמת העריכה' : e.message || 'אין חיבור לשרת, נסה שוב');
       });
     lastRemote.current = payload;
     setCode(fresh);
+  };
+
+  const realItems = () => items.filter((i) => !i.example);
+
+  const connectAccount = async (mode, email, password) => {
+    if (code) throw new Error('המכשיר מחובר למטבח משותף. נתק אותו קודם.');
+    accountFlow.current = true;
+    try {
+      const user = await (mode === 'register' ? registerAccount : loginAccount)(email, password);
+      const path = `users/${user.uid}`;
+      const timeout = 'השרת לא הגיב. בדוק חיבור לאינטרנט ונסה שוב';
+      const remote = await withTimeout(fetchDoc(path, { signed: true }), 15000, timeout);
+      const mine = realItems();
+      const localPayload = JSON.stringify({ items: mine, checked, orders, removedOrders, appliedMigrations: applied });
+      const upload = async () => {
+        await withTimeout(saveDoc(path, { payload: localPayload }), 15000, timeout);
+        lastRemote.current = localPayload;
+        setItems(mine);
+      };
+      if (!remote) await upload();
+      else if ((mine.length || orders.length)
+        && !window.confirm('נמצא מלאי שמור בחשבון שלך.\nאישור: לטעון אותו ולהחליף את המלאי שבמכשיר זה.\nביטול: להעלות את המלאי של המכשיר ולהחליף את מה ששמור בחשבון.')) await upload();
+      else applyRemote(remote);
+      setAccountUser({ uid: user.uid, email: user.email || email });
+    } finally {
+      accountFlow.current = false;
+    }
   };
 
   useEffect(() => {
@@ -160,7 +200,7 @@ export default function App() {
     setItems((p) => p.map((i) => (i.id === id ? { ...i, quantity: Math.max(0, qtyOf(i) + delta) } : i))));
   const setQty = guard((id, value) => setItems((p) => p.map((i) => (i.id === id ? { ...i, quantity: value, max: Math.max(i.max || 1, value) } : i))));
   const updateItem = guard((id, patch) => {
-    setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+    setItems((p) => p.map((i) => (i.id === id ? { ...i, ...patch, example: undefined } : i)));
     setEditingId(null);
   });
   const setMin = guard((id, value) => setItems((p) => p.map((i) => (i.id === id ? { ...i, lowThreshold: value, max: Math.max(i.max || 1, value * 2) } : i))));
@@ -189,6 +229,13 @@ export default function App() {
       setRemovedOrders((p) => [...p, id]);
     }
   });
+  const clearExamples = guard(() => setItems((p) => p.filter((i) => !i.example)));
+  const exportExcel = async () => {
+    const mine = realItems();
+    if (!mine.length && !orders.length) { window.alert('אין עדיין נתונים לייצוא. מוצרי הדוגמה לא נכללים.'); return; }
+    const [{ default: writeExcelFile }, { buildSheets }] = await Promise.all([import('write-excel-file/browser'), import('./exportExcel.js')]);
+    downloadBlob(await writeExcelFile(buildSheets(mine, orders)).toBlob(), `inventory-${todayIso()}.xlsx`);
+  };
   const applyImport = guard((plan) => {
     setItems(plan.items);
     setOrders(plan.orders);
@@ -274,6 +321,12 @@ export default function App() {
             {syncStatus === 'off' ? 'סנכרון' : syncStatus === 'error' ? 'לא מחובר' : syncStatus === 'syncing' ? 'מסנכרן…' : 'מסונכרן'}
           </button>
           <button
+            onClick={exportExcel}
+            className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 font-bold shadow-sm ring-1 ring-black/5 transition hover:bg-stone-50"
+          >
+            <Download size={20} className="text-sky-600" /> ייצוא לאקסל
+          </button>
+          <button
             onClick={guard(() => setShowImport(true))}
             className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 font-bold shadow-sm ring-1 ring-black/5 transition hover:bg-stone-50"
           >
@@ -301,6 +354,15 @@ export default function App() {
         </div>
       )}
 
+      {items.some((i) => i.example) && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-sky-50 p-4 text-sky-800 ring-1 ring-sky-200">
+          <span>אלה מוצרי דוגמה כדי שתראה איך זה עובד. אפשר לייבא קובץ אקסל משלך או להוסיף מוצרים, ולמחוק את הדוגמאות.</span>
+          <span className="flex gap-2">
+            <button onClick={() => setShowImport(true)} className="rounded-xl bg-sky-600 px-4 py-2 font-bold text-white hover:bg-sky-700">ייבוא מאקסל</button>
+            <button onClick={clearExamples} className="rounded-xl bg-white px-4 py-2 font-bold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-100">מחק דוגמאות</button>
+          </span>
+        </div>
+      )}
       {items.length === 0 && (
         <section className="mb-8 rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
           <ChefHat size={48} className="mx-auto mb-3 text-orange-400" />
@@ -469,8 +531,9 @@ export default function App() {
 
 
       {showSync && (
-        <SyncModal code={code} status={syncStatus} onClose={() => setShowSync(false)}
-          onCreate={createKitchen} onJoin={joinKitchen} onLeave={() => setCode('')} />
+        <SyncModal code={code} status={syncStatus} accountUser={accountUser} accountsEnabled={ACCOUNTS_ENABLED}
+          onClose={() => setShowSync(false)} onCreate={createKitchen} onJoin={joinKitchen} onLeave={() => setCode('')}
+          onAccount={connectAccount} onLogout={() => lockEditing()} onReset={resetPassword} />
       )}
       {showUnlock && <UnlockModal onClose={() => setShowUnlock(false)} />}
       {showOrder && <OrderModal items={lowItems} onClose={() => setShowOrder(false)} onSaveOrder={saveOrder} />}
