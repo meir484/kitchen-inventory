@@ -1,3 +1,5 @@
+import { isLegacyState } from './data.js';
+
 // One-time stock updates shipped with the app (e.g. receiving a delivery).
 // Each runs once per saved state; the applied ids travel with the synced data.
 const SHAMAI = 'ר. שמאי';
@@ -78,6 +80,8 @@ export const MIGRATIONS = [
 ];
 
 export function runMigrations(items, applied = []) {
+  // These updates are specific to the original kitchen's data; other states just record them as done.
+  if (!isLegacyState(items)) return { items, applied: [...new Set([...applied, ...MIGRATIONS.map((m) => m.id)])] };
   let next = items;
   const done = [...applied];
   MIGRATIONS.filter((m) => !done.includes(m.id)).forEach((m) => {

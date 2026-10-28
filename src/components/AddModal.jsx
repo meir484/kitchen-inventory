@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
-import { CATEGORIES, UNITS } from '../data.js';
+import { UNITS, categoryIdFromLabel, catLabel } from '../data.js';
 
 const emptyForm = {
-  name: '', category: 'dry', quantity: 1, unit: UNITS[0], max: 5, lowThreshold: 1, expiry: '', supplier: '', price: '',
+  name: '', category: '', quantity: 1, unit: UNITS[0], max: 5, lowThreshold: 1, expiry: '', supplier: '', price: '',
 };
 
-export default function AddModal({ onClose, onSave }) {
-  const [f, setF] = useState(emptyForm);
+export default function AddModal({ categories, onClose, onSave }) {
+  const [f, setF] = useState(() => ({ ...emptyForm, category: categories[0]?.label || 'כללי' }));
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const num = (k) => (e) => set(k, e.target.value === '' ? '' : Math.max(0, Number(e.target.value)));
   const valid = f.name.trim() && f.quantity !== '' && f.lowThreshold !== '' && f.max !== '';
@@ -17,6 +17,7 @@ export default function AddModal({ onClose, onSave }) {
     if (!valid) return;
     onSave({
       ...f,
+      category: categoryIdFromLabel(f.category),
       name: f.name.trim(),
       supplier: f.supplier.trim(),
       price: f.price === '' ? null : Number(f.price),
@@ -41,9 +42,8 @@ export default function AddModal({ onClose, onSave }) {
           </div>
           <div>
             <label className={label}>קטגוריה</label>
-            <select className={input} value={f.category} onChange={(e) => set('category', e.target.value)}>
-              {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
+            <input id="add-category" list="add-categories" className={input} value={f.category} onChange={(e) => set('category', e.target.value)} placeholder="למשל: יבשים" />
+            <datalist id="add-categories">{categories.map((c) => <option key={c.id} value={c.label} />)}</datalist>
           </div>
           <div>
             <label className={label}>יחידת מידה</label>

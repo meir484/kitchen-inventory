@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Package, AlertTriangle, CalendarClock, Plus, Search, ShoppingCart, LayoutGrid, CheckCircle2, Circle,
-  ChefHat, PackageCheck, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet, BellOff,
+  ChefHat, PackageCheck, FileSpreadsheet, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet, BellOff,
 } from 'lucide-react';
-import { CATEGORIES, catLabel, mergeSeedOrders, seedItems, seedOrders } from './data.js';
+import { catLabel, categoriesOf, mergeSeedOrders } from './data.js';
 import {
   daysUntil, EXPIRY_SOON_DAYS, load, money, needsOrder, normalizeState, orderStats, qtyOf, save, STATUS, stockStatus, stockValue,
 } from './lib.js';
@@ -13,6 +13,7 @@ import {
 import { runMigrations } from './migrations.js';
 import ItemCard from './components/ItemCard.jsx';
 import EditModal from './components/EditModal.jsx';
+import ImportModal from './components/ImportModal.jsx';
 import AddModal from './components/AddModal.jsx';
 import SyncModal from './components/SyncModal.jsx';
 import UnlockModal from './components/UnlockModal.jsx';
@@ -42,11 +43,11 @@ function StatCard({ icon: Icon, label, value, tone }) {
 }
 
 export default function App() {
-  const [boot] = useState(() => runMigrations(load(ITEMS_KEY, seedItems()), load(APPLIED_KEY, [])));
+  const [boot] = useState(() => runMigrations(load(ITEMS_KEY, []), load(APPLIED_KEY, [])));
   const [items, setItems] = useState(boot.items);
   const [applied, setApplied] = useState(boot.applied);
   const [removedOrders, setRemovedOrders] = useState(() => load(REMOVED_KEY, []));
-  const [orders, setOrders] = useState(() => mergeSeedOrders(load(ORDERS_KEY, seedOrders()), load(REMOVED_KEY, [])));
+  const [orders, setOrders] = useState(() => mergeSeedOrders(load(ORDERS_KEY, []), load(REMOVED_KEY, []), boot.items));
   const [checked, setChecked] = useState(() => load(CHECKED_KEY, []));
   const [tab, setTab] = useState('inventory');
   const [category, setCategory] = useState('all');
@@ -56,6 +57,7 @@ export default function App() {
   const [view, setView] = useState(() => load(VIEW_KEY, 'grouped'));
   const [openGroups, setOpenGroups] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [showSync, setShowSync] = useState(false);
   const [showUnlock, setShowUnlock] = useState(false);
@@ -85,7 +87,7 @@ export default function App() {
     setItems(migrated.items);
     setApplied(migrated.applied);
     setChecked(next.checked);
-    setOrders(mergeSeedOrders(next.orders, next.removedOrders));
+    setOrders(mergeSeedOrders(next.orders, next.removedOrders, migrated.items));
     setRemovedOrders(next.removedOrders);
   };
 
@@ -187,15 +189,13 @@ export default function App() {
       setRemovedOrders((p) => [...p, id]);
     }
   });
-  const resetToFile = guard(() => {
-    if (window.confirm('לטעון מחדש את המלאי והיסטוריית ההזמנות מקובץ ההתחלה? כל השינויים הנוכחיים יימחקו.')) {
-      const fresh = runMigrations(seedItems(), []);
-      setItems(fresh.items);
-      setApplied(fresh.applied);
-      setOrders(seedOrders());
-      setRemovedOrders([]);
-      setChecked([]);
-    }
+  const applyImport = guard((plan) => {
+    setItems(plan.items);
+    setOrders(plan.orders);
+    setChecked([]);
+    setShowImport(false);
+    setCategory('all');
+    setTab('inventory');
   });
 
   const rhythms = useMemo(() => orderStats(orders), [orders]);
@@ -219,14 +219,15 @@ export default function App() {
     return [...list].sort(sorters[sort]);
   }, [items, category, query, sort, onlyMuted]);
 
+  const categories = useMemo(() => categoriesOf(items), [items]);
   const sections = useMemo(
-    () => CATEGORIES
+    () => categories
       .map((c) => {
         const list = visible.filter((i) => i.category === c.id);
         return { ...c, list, low: list.filter(needsOrder).length, value: list.reduce((s, i) => s + stockValue(i), 0) };
       })
       .filter((c) => c.list.length),
-    [visible],
+    [visible, categories],
   );
 
   const toggleGroup = (id) => setOpenGroups((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
@@ -273,6 +274,12 @@ export default function App() {
             {syncStatus === 'off' ? 'סנכרון' : syncStatus === 'error' ? 'לא מחובר' : syncStatus === 'syncing' ? 'מסנכרן…' : 'מסונכרן'}
           </button>
           <button
+            onClick={guard(() => setShowImport(true))}
+            className="flex items-center gap-2 rounded-xl bg-white px-4 py-3 font-bold shadow-sm ring-1 ring-black/5 transition hover:bg-stone-50"
+          >
+            <FileSpreadsheet size={20} className="text-emerald-600" /> ייבוא מאקסל
+          </button>
+          <button
             onClick={guard(() => setShowAdd(true))}
             className="flex items-center gap-2 rounded-xl bg-gradient-to-l from-orange-500 to-rose-500 px-5 py-3 font-bold text-white shadow-lg transition hover:scale-105"
           >
@@ -294,6 +301,19 @@ export default function App() {
         </div>
       )}
 
+      {items.length === 0 && (
+        <section className="mb-8 rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-black/5">
+          <ChefHat size={48} className="mx-auto mb-3 text-orange-400" />
+          <h2 className="mb-2 text-2xl font-extrabold">ברוכים הבאים למלאי המטבח</h2>
+          <p className="mx-auto mb-5 max-w-md text-stone-600">עדיין אין כאן מוצרים. אפשר להעלות קובץ אקסל והמערכת תיצור הכול לבד, להוסיף מוצר ידנית, או להתחבר למטבח משותף עם קוד.</p>
+          <div className="flex flex-wrap justify-center gap-3">
+            <button onClick={() => setShowImport(true)} className="flex items-center gap-2 rounded-xl bg-gradient-to-l from-orange-500 to-rose-500 px-5 py-3 font-bold text-white shadow-lg"><FileSpreadsheet size={20} /> ייבוא מאקסל</button>
+            <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 rounded-xl bg-stone-100 px-5 py-3 font-bold hover:bg-stone-200"><Plus size={20} /> הוספת מוצר ידנית</button>
+            <button onClick={() => setShowSync(true)} className="flex items-center gap-2 rounded-xl bg-stone-100 px-5 py-3 font-bold hover:bg-stone-200"><Cloud size={20} /> התחברות עם קוד</button>
+          </div>
+        </section>
+      )}
+
       <section className="mb-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard icon={Package} label="סה״כ פריטים" value={items.length} tone="bg-sky-100 text-sky-600" />
         <StatCard icon={AlertTriangle} label="לחידוש (מתחת למינימום)" value={lowItems.length} tone="bg-amber-100 text-amber-600" />
@@ -310,7 +330,7 @@ export default function App() {
       {tab === 'inventory' && (
         <>
           <div className="mb-4 flex flex-wrap gap-2">
-            {[{ id: 'all', label: 'הכל', emoji: '🍽️' }, ...CATEGORIES].map((c) => {
+            {[{ id: 'all', label: 'הכל', emoji: '🍽️' }, ...categories].map((c) => {
               const count = c.id === 'all' ? items.length : items.filter((i) => i.category === c.id).length;
               return (
                 <button
@@ -447,9 +467,6 @@ export default function App() {
 
       {tab === 'history' && <OrdersHistory orders={orders} onDeleteOrder={deleteOrderRow} />}
 
-      <footer className="mt-10 text-center text-xs text-stone-400">
-        <button onClick={resetToFile} className="underline hover:text-stone-600">טען מחדש את נתוני ההתחלה מהקובץ</button>
-      </footer>
 
       {showSync && (
         <SyncModal code={code} status={syncStatus} onClose={() => setShowSync(false)}
@@ -460,13 +477,15 @@ export default function App() {
       {editingId && items.find((i) => i.id === editingId) && (
         <EditModal
           item={items.find((i) => i.id === editingId)}
+          categories={categories}
           suppliers={[...new Set(items.map((i) => i.supplier).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'he'))}
           onClose={() => setEditingId(null)}
           onSave={updateItem}
           onDelete={(id) => { setEditingId(null); remove(id); }}
         />
       )}
-      {showAdd && <AddModal onClose={() => setShowAdd(false)} onSave={add} />}
+      {showImport && <ImportModal items={items} orders={orders} onClose={() => setShowImport(false)} onApply={applyImport} />}
+      {showAdd && <AddModal categories={categories} onClose={() => setShowAdd(false)} onSave={add} />}
     </div>
   );
 }

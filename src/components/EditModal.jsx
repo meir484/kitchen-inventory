@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Bell, BellOff, Trash2, X } from 'lucide-react';
-import { CATEGORIES, UNITS } from '../data.js';
+import { UNITS, categoryIdFromLabel, catLabel } from '../data.js';
 
-export default function EditModal({ item, suppliers, onClose, onSave, onDelete }) {
+export default function EditModal({ item, categories, suppliers, onClose, onSave, onDelete }) {
   const [f, setF] = useState({
     name: item.name,
     quantity: item.quantity ?? '',
     muted: !!item.muted,
-    category: item.category,
+    category: catLabel(item.category).label,
     unit: item.unit,
     lowThreshold: item.lowThreshold,
     max: item.max,
@@ -27,7 +27,7 @@ export default function EditModal({ item, suppliers, onClose, onSave, onDelete }
       name: f.name.trim(),
       quantity: f.quantity === '' ? null : Number(f.quantity),
       muted: f.muted,
-      category: f.category,
+      category: categoryIdFromLabel(f.category),
       unit: f.unit,
       lowThreshold: Number(f.lowThreshold),
       max: Math.max(Number(f.max), Number(f.quantity) || 0, 1),
@@ -58,9 +58,8 @@ export default function EditModal({ item, suppliers, onClose, onSave, onDelete }
           </div>
           <div>
             <label className={label} htmlFor="edit-category">קטגוריה</label>
-            <select id="edit-category" className={input} value={f.category} onChange={(e) => set('category', e.target.value)}>
-              {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-            </select>
+            <input id="edit-category" list="edit-categories" className={input} value={f.category} onChange={(e) => set('category', e.target.value)} placeholder="למשל: יבשים" />
+            <datalist id="edit-categories">{categories.map((c) => <option key={c.id} value={c.label} />)}</datalist>
           </div>
           <div>
             <label className={label} htmlFor="edit-unit">יחידת מידה</label>
