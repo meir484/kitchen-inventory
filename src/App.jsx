@@ -27,8 +27,8 @@ const REMOVED_KEY = 'kitchen-inventory:v2:removedOrders';
 const CHECKED_KEY = 'kitchen-inventory:v2:checked';
 const VIEW_KEY = 'kitchen-inventory:v2:view';
 const CODE_KEY = 'kitchen-inventory:code';
-// Personal accounts stay off until the matching Firestore rules are published.
-const ACCOUNTS_ENABLED = import.meta.env.VITE_ACCOUNTS === '1';
+// Personal accounts need the matching Firestore rules; set VITE_ACCOUNTS=0 to switch them off.
+const ACCOUNTS_ENABLED = import.meta.env.VITE_ACCOUNTS !== '0';
 
 function StatCard({ icon: Icon, label, value, tone }) {
   return (
