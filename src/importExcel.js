@@ -13,6 +13,8 @@ const ITEM_COLUMNS = {
   supplier: ['ספק', 'supplier'],
   price: ['מחיר ליחידה', 'מחיר', 'price'],
   expiry: ['תאריך תפוגה', 'תפוגה', 'expiry'],
+  packSize: ['כמות במארז', 'יחידות במארז', 'pack size'],
+  offers: ['ספקים ומחירים', 'מחירים לפי ספק'],
   lastOrderQty: ['כמות הזמנה אחרונה'],
   lastOrderDate: ['תאריך הזמנה אחרונה'],
 };
@@ -35,6 +37,20 @@ export const toNumber = (v) => {
   const n = Number(v.replace(/[₪,\s]/g, (c) => (c === ',' ? '.' : '')));
   return v.trim() !== '' && Number.isFinite(n) ? n : null;
 };
+
+// "ספק א'=3.3; ספק ב'=2.9"  ->  [{ supplier, price }, ...]
+export const parseOffers = (v) => {
+  if (typeof v !== 'string' || !v.trim()) return undefined;
+  const offers = v.split(';').map((part) => {
+    const at = part.lastIndexOf('=');
+    if (at < 0) return null;
+    const supplier = normText(part.slice(0, at));
+    const price = toNumber(part.slice(at + 1));
+    return supplier && price !== null ? { supplier, price } : null;
+  }).filter(Boolean);
+  return offers.length ? offers : undefined;
+};
+export const formatOffers = (offers) => (offers || []).map((o) => `${o.supplier}=${o.price ?? ''}`).join('; ');
 
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -139,6 +155,8 @@ export function parseWorkbook(sheets, now = Date.now()) {
         expiry: cols.expiry === undefined ? '' : toIsoDate(row[cols.expiry]),
         supplier: text(row, cols, 'supplier'),
         price: num(row, cols, 'price'),
+        packSize: (num(row, cols, 'packSize') || 0) > 1 ? num(row, cols, 'packSize') : undefined,
+        offers: cols.offers === undefined ? undefined : parseOffers(row[cols.offers]),
         lastOrderQty: num(row, cols, 'lastOrderQty'),
         lastOrderDate: cols.lastOrderDate === undefined ? '' : toIsoDate(row[cols.lastOrderDate]),
       });
@@ -173,6 +191,8 @@ export function planImport(allItems, currentOrders, parsed, { mode, includeOrder
       if (inc.hasMin) patch.lowThreshold = inc.lowThreshold;
       if (inc.supplier) patch.supplier = inc.supplier;
       if (inc.price !== null) patch.price = inc.price;
+      if (inc.packSize) patch.packSize = inc.packSize;
+      if (inc.offers) patch.offers = inc.offers;
       if (inc.unit !== 'יח׳') patch.unit = inc.unit;
       if (inc.expiry) patch.expiry = inc.expiry;
       if (inc.lastOrderQty !== null) patch.lastOrderQty = inc.lastOrderQty;
@@ -199,7 +219,7 @@ export function planImport(allItems, currentOrders, parsed, { mode, includeOrder
 }
 
 export const templateRows = [
-  ['שם פריט', 'קטגוריה', 'מלאי נוכחי', 'מלאי מינימלי', 'יחידה', 'ספק', 'מחיר ליחידה', 'תאריך תפוגה'],
-  ['דוגמה: אורז', 'יבשים', 5, 2, 'ק״ג', 'ספק לדוגמה', 7.5, ''],
-  ['דוגמה: חלב', 'מקרר', 6, 4, 'ליטר', '', 6, '2026-12-31'],
+  ['שם פריט', 'קטגוריה', 'מלאי נוכחי', 'מלאי מינימלי', 'יחידה', 'ספק', 'מחיר ליחידה', 'תאריך תפוגה', 'כמות במארז', 'ספקים ומחירים'],
+  ['דוגמה: אורז', 'יבשים', 5, 2, 'ק״ג', 'ספק א׳', 7.5, '', '', 'ספק א׳=7.5; ספק ב׳=6.9'],
+  ['דוגמה: קפה נמס', 'יבשים', 24, 12, 'יח׳', 'ספק א׳', 21, '', 12, ''],
 ];

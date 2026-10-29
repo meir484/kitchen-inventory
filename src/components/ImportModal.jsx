@@ -40,7 +40,7 @@ export default function ImportModal({ items, orders, onClose, onApply }) {
     const { default: writeExcelFile } = await import('write-excel-file/browser');
     const blob = await writeExcelFile(templateRows, {
       sheet: 'מוצרים',
-      columns: [26, 14, 12, 14, 10, 18, 14, 16].map((width) => ({ width })),
+      columns: [26, 14, 12, 14, 10, 18, 14, 16, 14, 30].map((width) => ({ width })),
     }).toBlob();
     downloadBlob(blob, 'inventory-template.xlsx');
   };
@@ -74,7 +74,7 @@ export default function ImportModal({ items, orders, onClose, onApply }) {
             </label>
             <div className="mt-4 rounded-control bg-subtle p-3 text-sm text-ink-2">
               <div className="mb-1 font-medium">עמודות שהמערכת מכירה:</div>
-              שם פריט (חובה), קטגוריה, מלאי נוכחי, מלאי מינימלי, יחידה, ספק, מחיר ליחידה, תאריך תפוגה.
+              שם פריט (חובה), קטגוריה, מלאי נוכחי, מלאי מינימלי, יחידה, ספק, מחיר ליחידה, תאריך תפוגה, כמות במארז, וספקים ומחירים (בצורה: ספק א׳=3.3; ספק ב׳=2.9).
               <button onClick={downloadTemplate} className="mt-3 flex items-center gap-2 font-bold text-primary underline">
                 <Download size={16} /> הורד תבנית אקסל מוכנה
               </button>

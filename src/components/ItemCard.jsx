@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Minus, Trash2, CalendarClock, Truck, Bell, BellOff, Pencil, Ellipsis } from 'lucide-react';
 import { catLabel } from '../data.js';
-import { STATUS, expiryInfo, formatDate, isCounted, money, qtyOf, stockStatus } from '../lib.js';
+import { STATUS, cheapestOffer, expiryInfo, formatDate, formatPacks, hasPacks, isCounted, money, offersOf, qtyOf, stockStatus } from '../lib.js';
 import CategoryIcon from './CategoryIcon.jsx';
 
 function ItemMenu({ item, onEdit, onToggleMute, onDelete }) {
@@ -55,7 +55,9 @@ export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMut
   const exp = expiryInfo(item.expiry);
   const counted = isCounted(item);
   const pct = counted ? Math.min(100, Math.max(qtyOf(item) > 0 ? 4 : 0, (qtyOf(item) / (item.max || 1)) * 100)) : 0;
-  const hasMeta = item.supplier || item.price || item.lastOrderDate || rhythm?.avgInterval;
+  const offers = offersOf(item);
+  const best = offers.length > 1 ? cheapestOffer(item) : null;
+  const hasMeta = item.supplier || item.price || item.lastOrderDate || rhythm?.avgInterval || offers.length > 1;
 
   const editQty = () => {
     const v = window.prompt(`כמות חדשה ל"${item.name}":`, counted ? String(item.quantity) : '');
@@ -98,6 +100,7 @@ export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMut
           >
             <span className="t-number block">{counted ? item.quantity : '—'}</span>
             <span className="t-micro block">{item.unit}</span>
+            {hasPacks(item) && counted && <span className="t-micro block whitespace-nowrap font-semibold text-ink-2">{formatPacks(item.quantity, item.packSize)}</span>}
           </button>
           <button onClick={() => onAdjust(item.id, -1)} disabled={qtyOf(item) <= 0} aria-label={`הפחת מ${item.name}`} className="step step-down"><Minus size={18} /></button>
         </div>
@@ -115,8 +118,22 @@ export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMut
         <div className="mt-auto flex flex-col gap-1.5 border-t border-line pt-3 text-[13px] text-ink-2">
           {hasMeta && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              {item.supplier && <span className="inline-flex items-center gap-1"><Truck size={13} /> {item.supplier}</span>}
-              {item.price ? <span>{money(item.price)} ליח׳</span> : null}
+              {offers.length > 1 ? (
+                <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <Truck size={13} aria-hidden="true" />
+                  {offers.map((o) => (
+                    <span key={`${o.supplier}-${o.price}`} className={best && o.supplier === best.supplier && o.price === best.price ? 'font-semibold text-success-text' : ''}>
+                      {o.supplier || 'ספק'} {o.price != null ? money(o.price) : ''}
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                <>
+                  {item.supplier && <span className="inline-flex items-center gap-1"><Truck size={13} aria-hidden="true" /> {item.supplier}</span>}
+                  {item.price ? <span>{money(item.price)} ליח׳</span> : null}
+                </>
+              )}
+              {hasPacks(item) && <span>{item.packSize} במארז</span>}
               {rhythm?.avgInterval ? <span className="font-semibold text-info-text">מוזמן בערך כל {rhythm.avgInterval} ימים</span> : null}
               {item.lastOrderDate && <span>הזמנה אחרונה: {formatDate(item.lastOrderDate)}{item.lastOrderQty ? ` (${item.lastOrderQty})` : ''}</span>}
             </div>

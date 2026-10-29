@@ -44,7 +44,27 @@ export const stockStatus = (i) => {
   if (i.lowThreshold > 0 && i.quantity <= i.lowThreshold * 1.5) return 'near';
   return 'full';
 };
+export const suggestPacks = (i) => Math.max(Math.ceil(suggestQty(i) / i.packSize), 1);
 export const stockValue = (i) => (isCounted(i) && i.price ? i.quantity * i.price : 0);
+// Several suppliers per item: `offers` is [{ supplier, price }]. Without it the single supplier/price pair counts as one offer.
+export const offersOf = (i) => {
+  const list = (i.offers || []).filter((o) => o && (o.supplier || (o.price !== null && o.price !== undefined)));
+  if (list.length) return list;
+  return i.supplier || (i.price !== null && i.price !== undefined) ? [{ supplier: i.supplier || '', price: i.price ?? null }] : [];
+};
+export const cheapestOffer = (i) => [...offersOf(i)].filter((o) => o.price > 0).sort((a, b) => a.price - b.price)[0] || null;
+
+// Packs: `packSize` = units per pack (optional). Quantity itself stays in units.
+export const hasPacks = (i) => i.packSize > 1;
+export const formatPacks = (qty, size) => {
+  const full = Math.floor(qty / size);
+  const rest = Math.round((qty - full * size) * 100) / 100;
+  const parts = [];
+  if (full > 0 || rest === 0) parts.push(full === 1 ? 'מארז' : `${full} מארזים`);
+  if (rest > 0) parts.push(`${rest} יח׳`);
+  return parts.join(' ו-');
+};
+
 export const suggestQty = (i) => i.lastOrderQty || Math.max(Math.ceil((i.max || 1) - qtyOf(i)), 1);
 
 export const STATUS = {

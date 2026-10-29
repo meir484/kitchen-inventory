@@ -140,7 +140,7 @@ export default function OrdersHistory({ orders, onDeleteOrder }) {
                       {g.rows.map((r) => (
                         <tr key={r.id} className="border-t border-line">
                           <td className="p-2 text-right">{r.name}</td>
-                          <td className="p-2 text-center">{r.qty}</td>
+                          <td className="p-2 text-center">{r.qty}{r.packs ? <div className="t-micro">{r.packs} מארזים</div> : null}</td>
                           <td className="p-2 text-center">{r.price ? money(r.price) : '—'}</td>
                           <td className="p-2 text-center font-medium">{money(r.total)}</td>
                           <td className="p-2 text-center">

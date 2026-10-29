@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { UNITS, categoryIdFromLabel, catLabel } from '../data.js';
 
 const emptyForm = {
-  name: '', category: '', quantity: 1, unit: UNITS[0], max: 5, lowThreshold: 1, expiry: '', supplier: '', price: '',
+  name: '', category: '', quantity: 1, unit: UNITS[0], max: 5, lowThreshold: 1, expiry: '', supplier: '', price: '', packSize: '',
 };
 
 export default function AddModal({ categories, onClose, onSave }) {
@@ -21,6 +21,7 @@ export default function AddModal({ categories, onClose, onSave }) {
       name: f.name.trim(),
       supplier: f.supplier.trim(),
       price: f.price === '' ? null : Number(f.price),
+      packSize: f.packSize !== '' && Number(f.packSize) > 1 ? Number(f.packSize) : undefined,
       max: Math.max(Number(f.max), Number(f.quantity), 1),
     });
   };
@@ -70,6 +71,10 @@ export default function AddModal({ categories, onClose, onSave }) {
           <div>
             <label className={label}>ספק (אופציונלי)</label>
             <input className={input} value={f.supplier} onChange={(e) => set('supplier', e.target.value)} />
+          </div>
+          <div>
+            <label className={label} htmlFor="add-pack">כמות במארז (אופציונלי)</label>
+            <input id="add-pack" type="number" min="2" step="1" placeholder="למשל 6" className={input} value={f.packSize} onChange={num('packSize')} />
           </div>
           <div>
             <label className={label}>מחיר ליחידה (אופציונלי)</label>

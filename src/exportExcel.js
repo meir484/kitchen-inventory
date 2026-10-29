@@ -1,5 +1,6 @@
 import { categoriesOf } from './categories.js';
 import { needsOrder, stockValue } from './lib.js';
+import { formatOffers } from './importExcel.js';
 
 const bold = (value) => ({ value, fontWeight: 'bold' });
 const RESERVED = ['סיכום', 'יומן הזמנות'];
@@ -16,8 +17,8 @@ export function buildSheets(items, orders) {
   };
 
   const cats = categoriesOf(items);
-  const itemHeaders = ['שם פריט', 'מלאי נוכחי (בפועל)', 'מלאי מינימלי', 'להזמנה?', 'יחידה', 'ספק', 'מחיר ליחידה', 'תאריך תפוגה', 'כמות הזמנה אחרונה', 'תאריך הזמנה אחרונה'];
-  const itemWidths = [34, 18, 14, 12, 10, 22, 14, 14, 18, 18].map((width) => ({ width }));
+  const itemHeaders = ['שם פריט', 'מלאי נוכחי (בפועל)', 'מלאי מינימלי', 'להזמנה?', 'יחידה', 'ספק', 'מחיר ליחידה', 'תאריך תפוגה', 'כמות הזמנה אחרונה', 'תאריך הזמנה אחרונה', 'כמות במארז', 'ספקים ומחירים'];
+  const itemWidths = [34, 18, 14, 12, 10, 22, 14, 14, 18, 18, 14, 34].map((width) => ({ width }));
 
   const summary = [['קטגוריה', "מס' פריטים", 'פריטים לחידוש', 'שווי מלאי (מוערך)'].map(bold)];
   const sheets = [];
@@ -31,6 +32,7 @@ export function buildSheets(items, orders) {
         ...list.map((i) => [
           i.name, i.quantity ?? null, i.lowThreshold ?? 0, needsOrder(i) ? 'להזמנה' : null, i.unit || null, i.supplier || null,
           i.price ?? null, i.expiry || null, i.lastOrderQty ?? null, i.lastOrderDate || null,
+          i.packSize > 1 ? i.packSize : null, (i.offers || []).length > 1 ? formatOffers(i.offers) : null,
         ]),
       ],
     });

@@ -1,29 +1,43 @@
 import React, { useMemo, useState } from 'react';
 import { Copy, MessageCircle, Printer, X, ClipboardCheck } from 'lucide-react';
-import { formatDate, money, suggestQty, todayIso } from '../lib.js';
+import { cheapestOffer, formatDate, hasPacks, money, offersOf, suggestPacks, suggestQty, todayIso } from '../lib.js';
 
 const NO_SUPPLIER = 'ללא ספק';
 
+// The supplier to order from by default: the cheapest known offer, otherwise the item's own supplier.
+const defaultSupplier = (i) => cheapestOffer(i)?.supplier || i.supplier || '';
+
 export default function OrderModal({ items, onClose, onSaveOrder }) {
-  const [qty, setQty] = useState(() => Object.fromEntries(items.map((i) => [i.id, suggestQty(i)])));
+  // quantity is typed in packs for items that have a pack size, and in units otherwise
+  const [qty, setQty] = useState(() => Object.fromEntries(items.map((i) => [i.id, hasPacks(i) ? suggestPacks(i) : suggestQty(i)])));
+  const [pick, setPick] = useState(() => Object.fromEntries(items.map((i) => [i.id, defaultSupplier(i)])));
   const [skip, setSkip] = useState([]);
   const [invoice, setInvoice] = useState('');
   const [copied, setCopied] = useState(false);
 
+  // what is actually ordered for one item, given the chosen supplier and quantity
+  const effective = (i) => {
+    const supplier = pick[i.id] ?? '';
+    const offer = offersOf(i).find((o) => o.supplier === supplier);
+    const price = offer?.price ?? (supplier === (i.supplier || '') ? i.price : null) ?? 0;
+    const n = Number(qty[i.id]) || 0;
+    const units = hasPacks(i) ? Math.round(n * i.packSize * 100) / 100 : n;
+    return { item: i, supplier: supplier || NO_SUPPLIER, price: price || 0, packs: hasPacks(i) ? n : null, qty: units, total: units * (price || 0) };
+  };
+
   const groups = useMemo(() => {
     const map = new Map();
     items.forEach((i) => {
-      const key = i.supplier || NO_SUPPLIER;
+      const key = (pick[i.id] ?? '') || NO_SUPPLIER;
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(i);
     });
     return [...map.entries()].sort(([a], [b]) => (a === NO_SUPPLIER) - (b === NO_SUPPLIER) || a.localeCompare(b, 'he'));
-  }, [items]);
+  }, [items, pick]);
 
-  const lines = items
-    .filter((i) => !skip.includes(i.id) && Number(qty[i.id]) > 0)
-    .map((i) => ({ item: i, qty: Number(qty[i.id]), total: Number(qty[i.id]) * (i.price || 0) }));
-  const grand = lines.reduce((s, l) => s + l.total, 0);
+  const lines = items.filter((i) => !skip.includes(i.id) && Number(qty[i.id]) > 0).map(effective);
+  const grand = lines.reduce((sum, l) => sum + l.total, 0);
+  const amount = (l) => (l.packs !== null ? `${l.packs} ${l.packs === 1 ? 'מארז' : 'מארזים'} (${l.qty} יח׳)` : `${l.qty}`);
 
   const text = useMemo(() => {
     const out = [`רשימת הזמנה – ${formatDate(todayIso())}`];
@@ -31,11 +45,12 @@ export default function OrderModal({ items, onClose, onSaveOrder }) {
       const sel = list.map((i) => lines.find((l) => l.item.id === i.id)).filter(Boolean);
       if (!sel.length) return;
       out.push('', `*${supplier}*`);
-      sel.forEach((l) => out.push(`• ${l.item.name} – ${l.qty}`));
+      sel.forEach((l) => out.push(`• ${l.item.name} – ${amount(l)}`));
     });
     if (grand > 0) out.push('', `סה״כ משוער: ${money(grand)}`);
     return out.join('\n');
-  }, [groups, lines, grand]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groups, qty, pick, skip, grand]);
 
   const copy = async () => {
     try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* clipboard unavailable */ }
@@ -48,7 +63,7 @@ export default function OrderModal({ items, onClose, onSaveOrder }) {
     const body = groups.map(([supplier, list]) => {
       const sel = list.map((i) => lines.find((l) => l.item.id === i.id)).filter(Boolean);
       if (!sel.length) return '';
-      const rows = sel.map((l) => `<tr><td>${esc(l.item.name)}</td><td>${l.qty}</td><td>${l.item.price ? money(l.total) : ''}</td></tr>`).join('');
+      const rows = sel.map((l) => `<tr><td>${esc(l.item.name)}</td><td>${esc(amount(l))}</td><td>${l.price ? money(l.total) : ''}</td></tr>`).join('');
       return `<h2>${esc(supplier)}</h2><table><tr><th>פריט</th><th>כמות</th><th>סכום משוער</th></tr>${rows}</table>`;
     }).join('');
     w.document.write(`<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>רשימת הזמנה</title>
@@ -63,8 +78,9 @@ export default function OrderModal({ items, onClose, onSaveOrder }) {
   const saveOrder = () => {
     const date = todayIso();
     onSaveOrder(lines.map((l, k) => ({
-      id: `o-${Date.now()}-${k}`, date, invoice: invoice.trim(), supplier: l.item.supplier || NO_SUPPLIER,
-      name: l.item.name, qty: l.qty, price: l.item.price || 0, total: Math.round(l.total * 100) / 100,
+      id: `o-${Date.now()}-${k}`, date, invoice: invoice.trim(), supplier: l.supplier,
+      name: l.item.name, qty: l.qty, price: l.price, total: Math.round(l.total * 100) / 100,
+      ...(l.packs !== null ? { packs: l.packs, packSize: l.item.packSize } : {}),
     })));
   };
 
@@ -85,18 +101,38 @@ export default function OrderModal({ items, onClose, onSaveOrder }) {
               <ul className="divide-y divide-line rounded-card ring-1 ring-line">
                 {list.map((i) => {
                   const off = skip.includes(i.id);
+                  const e = effective(i);
+                  const offers = offersOf(i);
+                  const best = offers.length > 1 ? cheapestOffer(i) : null;
                   return (
-                    <li key={i.id} className={`flex items-center gap-3 p-3 ${off ? 'opacity-40' : ''}`}>
+                    <li key={i.id} className={`flex flex-wrap items-center gap-3 p-3 ${off ? 'opacity-40' : ''}`}>
                       <label className="-me-1 flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center"><input type="checkbox" checked={!off} aria-label={`כלול ${i.name}`}
                         onChange={() => setSkip((p) => (off ? p.filter((x) => x !== i.id) : [...p, i.id]))}
                         className="h-6 w-6 accent-primary" /></label>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 basis-40">
                         <div className="font-medium leading-snug">{i.name}</div>
-                        <div className="text-xs text-ink-3">במלאי {i.quantity} · מינימום {i.lowThreshold}{i.price ? ` · ${money(i.price)} ליח׳` : ''}</div>
+                        <div className="t-meta">במלאי {i.quantity} · מינימום {i.lowThreshold}{e.price ? ` · ${money(e.price)} ליח׳` : ''}{hasPacks(i) ? ` · ${i.packSize} במארז` : ''}</div>
+                        {offers.length > 1 && (
+                          <select
+                            value={pick[i.id] ?? ''}
+                            onChange={(ev) => setPick((p) => ({ ...p, [i.id]: ev.target.value }))}
+                            aria-label={`ספק עבור ${i.name}`}
+                            className="field mt-1 h-11 w-full text-sm"
+                          >
+                            {offers.map((o) => (
+                              <option key={`${o.supplier}-${o.price}`} value={o.supplier}>
+                                {o.supplier || 'ללא שם'} · {o.price != null ? money(o.price) : 'ללא מחיר'}{best && o.supplier === best.supplier && o.price === best.price ? ' (הזול ביותר)' : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
-                      <input type="number" min="0" value={qty[i.id]} aria-label={`כמות ל${i.name}`}
-                        onChange={(e) => setQty((p) => ({ ...p, [i.id]: e.target.value }))}
-                        className="field h-11 w-24 px-2 text-center" />
+                      <div className="flex shrink-0 flex-col items-center">
+                        <input type="number" min="0" step={hasPacks(i) ? 'any' : '1'} value={qty[i.id]} aria-label={`${hasPacks(i) ? 'מארזים' : 'כמות'} ל${i.name}`}
+                          onChange={(ev) => setQty((p) => ({ ...p, [i.id]: ev.target.value }))}
+                          className="field h-11 w-24 px-2 text-center" />
+                        <span className="t-micro mt-0.5">{hasPacks(i) ? `מארזים (${e.qty} יח׳)` : i.unit}</span>
+                      </div>
                     </li>
                   );
                 })}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Bell, BellOff, Trash2, X } from 'lucide-react';
+import { Bell, BellOff, Plus, Trash2, X } from 'lucide-react';
 import { UNITS, categoryIdFromLabel, catLabel } from '../data.js';
+import { offersOf } from '../lib.js';
 
 export default function EditModal({ item, categories, suppliers, onClose, onSave, onDelete }) {
   const [f, setF] = useState({
@@ -12,9 +13,14 @@ export default function EditModal({ item, categories, suppliers, onClose, onSave
     lowThreshold: item.lowThreshold,
     max: item.max,
     expiry: item.expiry || '',
-    supplier: item.supplier || '',
-    price: item.price ?? '',
+    packSize: item.packSize > 1 ? item.packSize : '',
   });
+  // suppliers and their prices; `pref` is the preferred row (it fills the item's own supplier/price)
+  const initialRows = offersOf(item).map((o) => ({ supplier: o.supplier || '', price: o.price ?? '' }));
+  const [rows, setRows] = useState(initialRows.length ? initialRows : [{ supplier: '', price: '' }]);
+  const [pref, setPref] = useState(() => Math.max(0, offersOf(item).findIndex((o) => o.supplier === (item.supplier || '') && (o.price ?? '') === (item.price ?? ''))));
+  const setRow = (idx, k, v) => setRows((p) => p.map((r, n) => (n === idx ? { ...r, [k]: v } : r)));
+  const removeRow = (idx) => { setRows((p) => (p.length > 1 ? p.filter((_, n) => n !== idx) : [{ supplier: '', price: '' }])); setPref((p) => (p === idx ? 0 : p > idx ? p - 1 : p)); };
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
   const num = (k) => (e) => set(k, e.target.value === '' ? '' : Math.max(0, Number(e.target.value)));
   const valid = f.name.trim() && f.lowThreshold !== '' && f.max !== '';
@@ -23,6 +29,8 @@ export default function EditModal({ item, categories, suppliers, onClose, onSave
   const submit = (e) => {
     e.preventDefault();
     if (!valid) return;
+    const clean = rows.map((r, n) => ({ ...r, n })).filter((r) => r.supplier.trim() || r.price !== '');
+    const main = clean.find((r) => r.n === pref) || clean[0];
     onSave(item.id, {
       name: f.name.trim(),
       quantity: f.quantity === '' ? null : Number(f.quantity),
@@ -32,8 +40,10 @@ export default function EditModal({ item, categories, suppliers, onClose, onSave
       lowThreshold: Number(f.lowThreshold),
       max: Math.max(Number(f.max), Number(f.quantity) || 0, 1),
       expiry: f.expiry,
-      supplier: f.supplier.trim(),
-      price: f.price === '' ? null : Number(f.price),
+      supplier: main ? main.supplier.trim() : '',
+      price: main && main.price !== '' ? Number(main.price) : null,
+      offers: clean.length > 1 ? clean.map((r) => ({ supplier: r.supplier.trim(), price: r.price === '' ? null : Number(r.price) })) : undefined,
+      packSize: f.packSize !== '' && Number(f.packSize) > 1 ? Number(f.packSize) : undefined,
     });
   };
 
@@ -68,14 +78,34 @@ export default function EditModal({ item, categories, suppliers, onClose, onSave
             </select>
           </div>
           <div>
-            <label className={label} htmlFor="edit-supplier">ספק</label>
-            <input id="edit-supplier" list="suppliers-list" className={input} value={f.supplier} onChange={(e) => set('supplier', e.target.value)} />
-            <datalist id="suppliers-list">{suppliers.map((s) => <option key={s} value={s} />)}</datalist>
+            <label className={label} htmlFor="edit-pack">כמות במארז (אופציונלי)</label>
+            <input id="edit-pack" type="number" min="2" step="1" placeholder="למשל 6" className={input} value={f.packSize} onChange={num('packSize')} />
           </div>
           <div>
-            <label className={label} htmlFor="edit-price">מחיר ליחידה (₪)</label>
-            <input id="edit-price" type="number" min="0" step="0.01" className={input} value={f.price} onChange={(e) => set('price', e.target.value)} />
+            <label className={label} htmlFor="edit-packs">כמות מארזים</label>
+            <input
+              id="edit-packs" type="number" min="0" step="any" className={input} disabled={!(Number(f.packSize) > 1)}
+              placeholder={Number(f.packSize) > 1 ? '' : 'קבע כמות במארז'}
+              value={Number(f.packSize) > 1 && f.quantity !== '' ? Math.round((Number(f.quantity) / Number(f.packSize)) * 100) / 100 : ''}
+              onChange={(e) => set('quantity', e.target.value === '' ? '' : Math.round(Math.max(0, Number(e.target.value)) * Number(f.packSize) * 100) / 100)}
+            />
           </div>
+          <fieldset className="col-span-2">
+            <legend className="t-label mb-1">ספקים ומחיר ליחידה (₪)</legend>
+            <datalist id="suppliers-list">{suppliers.map((s) => <option key={s} value={s} />)}</datalist>
+            {rows.map((r, idx) => (
+              <div key={idx} className="mb-2 flex items-center gap-2">
+                <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center" title="ספק מועדף">
+                  <input type="radio" name="preferred-supplier" checked={pref === idx} onChange={() => setPref(idx)} aria-label={`ספק מועדף: שורה ${idx + 1}`} className="h-5 w-5 accent-primary" />
+                </label>
+                <input list="suppliers-list" className={`${input} min-w-0 flex-1`} value={r.supplier} onChange={(e) => setRow(idx, 'supplier', e.target.value)} placeholder="שם הספק" aria-label={`שם ספק ${idx + 1}`} />
+                <input type="number" min="0" step="0.01" className={`${input} w-20 shrink-0 px-2`} value={r.price} onChange={(e) => setRow(idx, 'price', e.target.value)} placeholder="מחיר" aria-label={`מחיר ספק ${idx + 1}`} />
+                <button type="button" onClick={() => removeRow(idx)} aria-label={`הסר ספק ${idx + 1}`} className="icon-btn shrink-0"><Trash2 size={16} /></button>
+              </div>
+            ))}
+            <button type="button" onClick={() => setRows((p) => [...p, { supplier: '', price: '' }])} className="btn-secondary text-sm"><Plus size={16} /> הוסף ספק</button>
+            <p className="t-micro mt-2">הספק המסומן הוא המועדף. בהפקת הזמנה אפשר לבחור ספק לכל פריט, והזול ביותר נבחר מראש.</p>
+          </fieldset>
           <div>
             <label className={label} htmlFor="edit-min">מלאי מינימלי</label>
             <input id="edit-min" type="number" min="0" className={input} value={f.lowThreshold} onChange={num('lowThreshold')} />
