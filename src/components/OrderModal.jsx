@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Copy, MessageCircle, Printer, X, ClipboardCheck } from 'lucide-react';
+import { Copy, MessageCircle, Minus, Plus, Printer, X, ClipboardCheck } from 'lucide-react';
 import { cheapestOffer, formatDate, hasPacks, money, offersOf, suggestPacks, suggestQty, todayIso } from '../lib.js';
 
 const NO_SUPPLIER = 'ללא ספק';
@@ -14,6 +14,8 @@ export default function OrderModal({ items, onClose, onSaveOrder }) {
   const [skip, setSkip] = useState([]);
   const [invoice, setInvoice] = useState('');
   const [copied, setCopied] = useState(false);
+
+  const bump = (id, delta) => setQty((p) => ({ ...p, [id]: Math.max(0, Math.round(((Number(p[id]) || 0) + delta) * 100) / 100) }));
 
   // what is actually ordered for one item, given the chosen supplier and quantity
   const effective = (i) => {
@@ -128,9 +130,17 @@ export default function OrderModal({ items, onClose, onSaveOrder }) {
                         )}
                       </div>
                       <div className="flex shrink-0 flex-col items-center">
-                        <input type="number" min="0" step={hasPacks(i) ? 'any' : '1'} value={qty[i.id]} aria-label={`${hasPacks(i) ? 'מארזים' : 'כמות'} ל${i.name}`}
-                          onChange={(ev) => setQty((p) => ({ ...p, [i.id]: ev.target.value }))}
-                          className="field h-11 w-24 px-2 text-center" />
+                        <div className="flex items-center gap-1.5">
+                          {hasPacks(i) && (
+                            <button type="button" onClick={() => bump(i.id, 1)} aria-label={`הוסף מארז ל${i.name}`} className="step step-up"><Plus size={18} aria-hidden="true" /></button>
+                          )}
+                          <input type="number" min="0" step={hasPacks(i) ? 'any' : '1'} value={qty[i.id]} aria-label={`${hasPacks(i) ? 'מארזים' : 'כמות'} ל${i.name}`}
+                            onChange={(ev) => setQty((p) => ({ ...p, [i.id]: ev.target.value }))}
+                            className="field h-11 w-20 px-2 text-center" />
+                          {hasPacks(i) && (
+                            <button type="button" onClick={() => bump(i.id, -1)} disabled={!(Number(qty[i.id]) > 0)} aria-label={`הפחת מארז מ${i.name}`} className="step step-down"><Minus size={18} aria-hidden="true" /></button>
+                          )}
+                        </div>
                         <span className="t-micro mt-0.5">{hasPacks(i) ? `מארזים (${e.qty} יח׳)` : i.unit}</span>
                       </div>
                     </li>
