@@ -96,8 +96,10 @@ export default function App() {
     setTheme(next);
   };
   const isEditor = !!authUser?.isEditor;
+  const [authReady, setAuthReady] = useState(false);
   useEffect(() => watchAuth((u) => {
     setAuthUser(u);
+    setAuthReady(true);
     if (!accountFlow.current) setAccountUser(ACCOUNTS_ENABLED && u && !u.isEditor ? u : null);
   }), []);
   const readOnly = !!code && !isEditor;
@@ -175,6 +177,32 @@ export default function App() {
 
   const realItems = () => items.filter((i) => !i.example);
 
+  // A device can hold both a shared-kitchen code (which needs the editor password) and a personal account.
+  // This moves what is on screen into the account, so editing needs no password any more.
+  const moveToAccount = async () => {
+    if (!accountUser) return;
+    if (!window.confirm(`להעביר את המלאי שמוצג כאן לחשבון האישי שלך (${accountUser.email})?\nמעכשיו תוכל לערוך בלי סיסמה, והמכשיר יפסיק להתעדכן מהמטבח המשותף. המטבח המשותף עצמו לא ייפגע.`)) return;
+    accountFlow.current = true;
+    try {
+      const path = `users/${accountUser.uid}`;
+      const timeout = 'השרת לא הגיב. בדוק חיבור לאינטרנט ונסה שוב';
+      const remote = await withTimeout(fetchDoc(path, { signed: true }), 15000, timeout);
+      const payload = JSON.stringify({ items: realItems(), checked, orders, removedOrders, appliedMigrations: applied });
+      if (remote && remote.payload !== payload) {
+        let hasData = false;
+        try { hasData = (JSON.parse(remote.payload).items || []).length > 0; } catch { hasData = true; }
+        if (hasData && !window.confirm('כבר יש מלאי שמור בחשבון האישי שלך.\nאישור: להחליף אותו במלאי שמוצג כאן.\nביטול: לא לבצע שינוי.')) return;
+      }
+      await withTimeout(saveDoc(path, { payload }), 15000, timeout);
+      lastRemote.current = payload;
+      setCode('');
+    } catch (e) {
+      window.alert(e.message || 'משהו השתבש, נסה שוב');
+    } finally {
+      accountFlow.current = false;
+    }
+  };
+
   const connectAccount = async (mode, email, password) => {
     if (code) throw new Error('המכשיר מחובר למטבח משותף. נתק אותו קודם.');
     accountFlow.current = true;
@@ -200,7 +228,10 @@ export default function App() {
     }
   };
 
+  const hashHandled = useRef(false);
   useEffect(() => {
+    if (!authReady || hashHandled.current) return;
+    hashHandled.current = true;
     const m = location.hash.match(/^#k=([\w-]+)$/);
     if (!m || m[1] === code) return;
     history.replaceState(null, '', location.pathname + location.search);
@@ -208,7 +239,7 @@ export default function App() {
       joinKitchen(m[1]).catch((e) => window.alert(e.message));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authReady]);
 
   const adjust = guard((id, delta) =>
     setItems((p) => p.map((i) => (i.id === id ? { ...i, quantity: Math.max(0, qtyOf(i) + delta) } : i))));
@@ -363,8 +394,11 @@ export default function App() {
 
       {readOnly && (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-card border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-text">
-          <span className="flex items-center gap-2"><Lock size={16} aria-hidden="true" /> מצב צפייה בלבד. לעריכה יש להזין סיסמה.</span>
-          <button onClick={() => setShowUnlock(true)} className="btn-ink">הזן סיסמה</button>
+          <span className="flex items-center gap-2"><Lock size={16} aria-hidden="true" /> {accountUser ? 'המכשיר מחובר למטבח משותף, ולכן העריכה דורשת סיסמה. אתה מחובר גם לחשבון אישי.' : 'מצב צפייה בלבד. לעריכה יש להזין סיסמה.'}</span>
+          <span className="flex flex-wrap gap-2">
+            {accountUser && <button onClick={moveToAccount} className="btn-primary">מעבר לחשבון האישי (בלי סיסמה)</button>}
+            <button onClick={() => setShowUnlock(true)} className={accountUser ? 'btn-secondary' : 'btn-ink'}>הזן סיסמת עריכה</button>
+          </span>
         </div>
       )}
 
@@ -525,7 +559,7 @@ export default function App() {
       {tab === 'history' && <OrdersHistory orders={orders} onDeleteOrder={deleteOrderRow} />}
 
       {showSync && (
-        <SyncModal code={code} status={syncStatus} accountUser={accountUser} accountsEnabled={ACCOUNTS_ENABLED}
+        <SyncModal code={code} status={syncStatus} accountUser={accountUser} onMoveToAccount={moveToAccount} accountsEnabled={ACCOUNTS_ENABLED}
           onClose={() => setShowSync(false)} onCreate={createKitchen} onJoin={joinKitchen} onLeave={() => setCode('')}
           onAccount={connectAccount} onLogout={() => lockEditing()} onReset={resetPassword} />
       )}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Cloud, CloudOff, Copy, Link2, LogOut, UserRound, X } from 'lucide-react';
 
-export default function SyncModal({ code, status, accountUser, accountsEnabled, onClose, onCreate, onJoin, onLeave, onAccount, onLogout, onReset }) {
+export default function SyncModal({ code, status, accountUser, onMoveToAccount, accountsEnabled, onClose, onCreate, onJoin, onLeave, onAccount, onLogout, onReset }) {
   const [input, setInput] = useState('');
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
@@ -35,7 +35,7 @@ export default function SyncModal({ code, status, accountUser, accountsEnabled, 
           <button onClick={onClose} aria-label="סגור" className="icon-btn -me-2"><X size={20} /></button>
         </div>
 
-        {accountUser ? (
+        {accountUser && !code ? (
           <>
             <p className="mb-4 rounded-control bg-success-soft p-3 text-success-text">
               {status === 'error' ? 'אין חיבור כרגע. השינויים יסונכרנו כשהחיבור יחזור.' : 'מחובר. המלאי שמור בענן וכל שינוי יופיע בכל מכשיר שתתחבר אליו.'}
@@ -62,6 +62,12 @@ export default function SyncModal({ code, status, accountUser, accountsEnabled, 
               <button onClick={() => copy(code, 'code')} className={`${btn} flex items-center gap-1 bg-tint hover:bg-tint-strong`}><Copy size={16} />{copied === 'code' ? 'הועתק' : 'העתק'}</button>
             </div>
             <p className="mb-5 text-xs text-ink-3">מי שמחזיק בקישור או בקוד יכול לראות ולערוך את המלאי. שתף רק עם בני הבית.</p>
+            {accountUser && (
+              <div className="mb-5 rounded-control border border-warning/30 bg-warning-soft p-3 text-sm text-warning-text">
+                <p className="mb-2">אתה מחובר גם לחשבון האישי <span dir="ltr">{accountUser.email}</span>. כדי לערוך בלי סיסמה, אפשר להעביר את המלאי לחשבון.</p>
+                <button onClick={() => { onClose(); onMoveToAccount(); }} className="btn-primary">מעבר לחשבון האישי</button>
+              </div>
+            )}
             <button onClick={() => { onLeave(); onClose(); }} className={`${btn} flex items-center gap-2 bg-danger-soft text-danger-text hover:brightness-95`}>
               <CloudOff size={16} /> התנתק במכשיר זה
             </button>
