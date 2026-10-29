@@ -165,3 +165,8 @@
   .hit { @apply relative; }
   .hit::after { content: ''; position: absolute; inset: -8px; }
 }
+
+@layer components {
+  /* wide stepper for whole packs */
+  .step-wide { @apply step w-auto flex-1 gap-1.5 px-3 text-sm font-semibold; }
+}

@@ -114,6 +114,17 @@ export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMut
         </button>
       </div>
 
+      {hasPacks(item) && (
+        <div className="flex gap-2">
+          <button onClick={() => onAdjust(item.id, item.packSize)} aria-label={`הוסף מארז (${item.packSize}) ל${item.name}`} className="step-wide step-up">
+            <Plus size={16} aria-hidden="true" /> מארז ({item.packSize})
+          </button>
+          <button onClick={() => onAdjust(item.id, -item.packSize)} disabled={qtyOf(item) <= 0} aria-label={`הפחת מארז (${item.packSize}) מ${item.name}`} className="step-wide step-down">
+            <Minus size={16} aria-hidden="true" /> מארז
+          </button>
+        </div>
+      )}
+
       {(hasMeta || exp) && (
         <div className="mt-auto flex flex-col gap-1.5 border-t border-line pt-3 text-[13px] text-ink-2">
           {hasMeta && (
