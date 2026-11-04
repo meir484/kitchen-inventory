@@ -6,6 +6,7 @@ export default function SyncModal({ code, status, accountUser, onMoveToAccount, 
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(true);
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -79,7 +80,7 @@ export default function SyncModal({ code, status, accountUser, onMoveToAccount, 
                 onSubmit={(e) => {
                   e.preventDefault();
                   setNotice('');
-                  run(() => onAccount(mode, email, password));
+                  run(() => onAccount(mode, email, password, remember));
                 }}
                 className="mb-5"
               >
@@ -95,6 +96,9 @@ export default function SyncModal({ code, status, accountUser, onMoveToAccount, 
                 <input type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} dir="ltr"
                   placeholder={mode === 'register' ? 'סיסמה (לפחות 6 תווים)' : 'סיסמה'} autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                   className="field mb-3 w-full " />
+                <label className="mb-3 flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-5 w-5 accent-primary" /> זכור אותי במחשב הזה
+                </label>
                 <button disabled={busy} className="btn-primary w-full">
                   {busy ? 'רגע…' : mode === 'register' ? 'צור חשבון' : 'התחבר'}
                 </button>

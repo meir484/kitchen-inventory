@@ -16,6 +16,7 @@ import EditModal from './components/EditModal.jsx';
 import ImportModal from './components/ImportModal.jsx';
 import AddModal from './components/AddModal.jsx';
 import SyncModal from './components/SyncModal.jsx';
+import Welcome from './components/Welcome.jsx';
 import UnlockModal from './components/UnlockModal.jsx';
 import OrderModal from './components/OrderModal.jsx';
 import OrdersHistory from './components/OrdersHistory.jsx';
@@ -27,6 +28,8 @@ const REMOVED_KEY = 'kitchen-inventory:v2:removedOrders';
 const CHECKED_KEY = 'kitchen-inventory:v2:checked';
 const VIEW_KEY = 'kitchen-inventory:v2:view';
 const CODE_KEY = 'kitchen-inventory:code';
+const GUEST_KEY = 'kitchen-inventory:guest';
+const SESSION_ONLY_KEY = 'kitchen-inventory:sessionOnly';
 // Personal accounts need the matching Firestore rules; set VITE_ACCOUNTS=0 to switch them off.
 const ACCOUNTS_ENABLED = import.meta.env.VITE_ACCOUNTS !== '0';
 
@@ -73,6 +76,14 @@ export default function App() {
   const [showUnlock, setShowUnlock] = useState(false);
   const [showOrder, setShowOrder] = useState(false);
   const [theme, setTheme] = useState(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'));
+  // Decided once, before anything is saved: people who already use the site (any data, a shared-kitchen code,
+  // or who chose to continue without an account) go straight to the inventory, exactly as before.
+  const [entry] = useState(() => ({
+    returning: load(ITEMS_KEY, []).length > 0 || load(ORDERS_KEY, []).length > 0 || !!load(CODE_KEY, '') || load(GUEST_KEY, false) === true,
+    shared: /^#k=/.test(location.hash),
+  }));
+  const [guest, setGuest] = useState(() => load(GUEST_KEY, false) === true);
+  const [sessionOnly, setSessionOnly] = useState(() => load(SESSION_ONLY_KEY, false) === true);
   const [authUser, setAuthUser] = useState(null);
   const [accountUser, setAccountUser] = useState(null);
   const accountFlow = useRef(false);
@@ -203,11 +214,11 @@ export default function App() {
     }
   };
 
-  const connectAccount = async (mode, email, password) => {
+  const connectAccount = async (mode, email, password, remember = true) => {
     if (code) throw new Error('המכשיר מחובר למטבח משותף. נתק אותו קודם.');
     accountFlow.current = true;
     try {
-      const user = await (mode === 'register' ? registerAccount : loginAccount)(email, password);
+      const user = await (mode === 'register' ? registerAccount : loginAccount)(email, password, remember);
       const path = `users/${user.uid}`;
       const timeout = 'השרת לא הגיב. בדוק חיבור לאינטרנט ונסה שוב';
       const remote = await withTimeout(fetchDoc(path, { signed: true }), 15000, timeout);
@@ -223,6 +234,8 @@ export default function App() {
         && !window.confirm('נמצא מלאי שמור בחשבון שלך.\nאישור: לטעון אותו ולהחליף את המלאי שבמכשיר זה.\nביטול: להעלות את המלאי של המכשיר ולהחליף את מה ששמור בחשבון.')) await upload();
       else applyRemote(remote);
       setAccountUser({ uid: user.uid, email: user.email || email });
+      save(SESSION_ONLY_KEY, !remember);
+      setSessionOnly(!remember);
     } finally {
       accountFlow.current = false;
     }
@@ -348,6 +361,24 @@ export default function App() {
   const syncLabel = syncStatus === 'off' ? 'התחברות' : syncStatus === 'error' ? 'לא מחובר' : syncStatus === 'syncing' ? 'מתחבר…' : 'מחובר';
   const SyncIcon = syncStatus === 'off' ? CloudOff : Cloud;
   const syncTone = syncStatus === 'error' ? 'text-danger-text' : syncStatus === 'syncing' ? 'text-warning-text' : syncStatus === 'ok' ? 'text-success-text' : 'text-ink-3';
+
+  const needsGate = ACCOUNTS_ENABLED && !entry.shared && !guest && (!entry.returning || sessionOnly);
+  if (needsGate && !authReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center text-ink-3" role="status" aria-label="טוען">
+        <ChefHat size={40} aria-hidden="true" />
+      </div>
+    );
+  }
+  if (needsGate && !accountUser && !isEditor) {
+    return (
+      <Welcome
+        onSubmit={connectAccount}
+        onReset={resetPassword}
+        onGuest={() => { save(GUEST_KEY, true); setGuest(true); }}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">

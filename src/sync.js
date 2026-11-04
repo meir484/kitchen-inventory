@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import {
-  createUserWithEmailAndPassword, getAuth, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut,
+  browserLocalPersistence, browserSessionPersistence, createUserWithEmailAndPassword, getAuth, onAuthStateChanged, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signOut,
 } from 'firebase/auth';
 
 // Public web identifiers; access is governed by the Firestore security rules.
@@ -124,11 +124,18 @@ const authFail = (e) => new Error(AUTH_ERRORS[e.code] || 'הפעולה נכשל�
 
 const isEditorEmail = (email) => (email || '').toLowerCase() === EDITOR_EMAIL;
 
-export const registerAccount = async (email, password) => {
+// "Remember me": local persistence keeps the session after the browser closes, session persistence ends it with the tab.
+const rememberSession = async (remember) => {
+  try { await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence); } catch { /* storage unavailable: default persistence applies */ }
+};
+
+export const registerAccount = async (email, password, remember = true) => {
   if (isEditorEmail(email)) throw new Error('כתובת האימייל הזו שמורה');
+  await rememberSession(remember);
   try { return (await createUserWithEmailAndPassword(auth, email.trim(), password)).user; } catch (e) { throw authFail(e); }
 };
-export const loginAccount = async (email, password) => {
+export const loginAccount = async (email, password, remember = true) => {
+  await rememberSession(remember);
   try { return (await signInWithEmailAndPassword(auth, email.trim(), password)).user; } catch (e) { throw authFail(e); }
 };
 export const resetPassword = async (email) => {
