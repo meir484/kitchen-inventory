@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Package, AlertTriangle, CalendarClock, Plus, Search, ShoppingCart, LayoutGrid, CheckCircle2, Circle,
-  ChefHat, PackageCheck, FileSpreadsheet, Download, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet, BellOff, Moon, Sun,
+  ChefHat, PackageCheck, FileSpreadsheet, Download, Cloud, CloudOff, Lock, LockOpen, History, FileText, Rows3, Grid3x3, ChevronDown, ChevronUp, Wallet, BellOff, Moon, Sun, Printer,
 } from 'lucide-react';
 import { catLabel, categoriesOf } from './data.js';
 import {
@@ -11,6 +11,7 @@ import {
   fetchDoc, isValidCode, loginAccount, lockEditing, newKitchenCode, registerAccount, resetPassword, saveDoc, watchAuth, watchDoc, withTimeout,
 } from './sync.js';
 import CategoryIcon from './components/CategoryIcon.jsx';
+import CountSheetModal from './components/CountSheetModal.jsx';
 import ItemCard from './components/ItemCard.jsx';
 import EditModal from './components/EditModal.jsx';
 import ImportModal from './components/ImportModal.jsx';
@@ -71,6 +72,7 @@ export default function App() {
   const [openGroups, setOpenGroups] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showCount, setShowCount] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [showSync, setShowSync] = useState(false);
   const [showUnlock, setShowUnlock] = useState(false);
@@ -501,6 +503,9 @@ export default function App() {
               <option value="shortage">מיון: לפי חוסר (הדחוף ראשון)</option>
               <option value="expiry">מיון: לפי תאריך תפוגה</option>
             </select>
+            <button onClick={() => setShowCount(true)} className="btn-secondary h-12">
+              <Printer size={16} aria-hidden="true" /> דף ספירה להדפסה
+            </button>
             <div className="flex gap-2" role="group" aria-label="תצוגה">
               {[['grouped', Rows3, 'לפי קטגוריות'], ['grid', Grid3x3, 'כל הפריטים']].map(([id, Icon, text]) => (
                 <button key={id} onClick={() => setView(id)} aria-pressed={view === id} className="seg h-12">
@@ -606,6 +611,7 @@ export default function App() {
           onDelete={(id) => { setEditingId(null); remove(id); }}
         />
       )}
+      {showCount && <CountSheetModal items={items} categories={categories} onClose={() => setShowCount(false)} />}
       {showImport && <ImportModal items={items} orders={orders} onClose={() => setShowImport(false)} onApply={applyImport} />}
       {showAdd && <AddModal categories={categories} onClose={() => setShowAdd(false)} onSave={add} />}
     </div>

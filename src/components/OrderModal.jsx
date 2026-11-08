@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Copy, MessageCircle, Minus, Plus, Printer, X, ClipboardCheck } from 'lucide-react';
-import { cheapestOffer, formatDate, hasPacks, money, offersOf, suggestPacks, suggestQty, todayIso } from '../lib.js';
+import { cheapestOffer, formatDate, hasPacks, money, offersOf, printHtml, suggestPacks, suggestQty, todayIso } from '../lib.js';
 
 const NO_SUPPLIER = 'ללא ספק';
 
@@ -59,8 +59,6 @@ export default function OrderModal({ items, onClose, onSaveOrder }) {
   };
 
   const print = () => {
-    const w = window.open('', '_blank');
-    if (!w) return;
     const esc = (t) => t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
     const body = groups.map(([supplier, list]) => {
       const sel = list.map((i) => lines.find((l) => l.item.id === i.id)).filter(Boolean);
@@ -68,13 +66,10 @@ export default function OrderModal({ items, onClose, onSaveOrder }) {
       const rows = sel.map((l) => `<tr><td>${esc(l.item.name)}</td><td>${esc(amount(l))}</td><td>${l.price ? money(l.total) : ''}</td></tr>`).join('');
       return `<h2>${esc(supplier)}</h2><table><tr><th>פריט</th><th>כמות</th><th>סכום משוער</th></tr>${rows}</table>`;
     }).join('');
-    w.document.write(`<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>רשימת הזמנה</title>
+    printHtml(`<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>רשימת הזמנה</title>
       <style>body{font-family:Arial,sans-serif;padding:24px}table{width:100%;border-collapse:collapse;margin-bottom:16px}
       td,th{border:1px solid #ccc;padding:6px 10px;text-align:right}th{background:#f3f3f3}</style></head>
       <body><h1>רשימת הזמנה – ${formatDate(todayIso())}</h1>${body}${grand > 0 ? `<p><b>סה״כ משוער: ${money(grand)}</b></p>` : ''}</body></html>`);
-    w.document.close();
-    w.focus();
-    w.print();
   };
 
   const saveOrder = () => {

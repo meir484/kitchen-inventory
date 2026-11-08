@@ -131,3 +131,20 @@ export function downloadBlob(blob, fileName) {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+// Prints an HTML document through a hidden iframe, so it works where pop-ups are blocked (phones included).
+export function printHtml(html) {
+  const frame = document.createElement('iframe');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  const cleanup = () => setTimeout(() => frame.remove(), 500);
+  frame.onload = () => {
+    const w = frame.contentWindow;
+    w.onafterprint = cleanup;
+    w.focus();
+    w.print();
+    setTimeout(() => frame.isConnected && frame.remove(), 120000);
+  };
+  frame.srcdoc = html;
+  document.body.appendChild(frame);
+}
