@@ -78,8 +78,39 @@ function receive(state, r) {
   return { items, orders: [...state.orders, ...rows.filter((o) => !have.has(o.id))], applied: [...state.applied, r.id] };
 }
 
+
+// One-off corrections of earlier matches. Same rules as receipts: once per saved inventory, id recorded in `applied`.
+const SALT = 'מלח שולחן 1 ק"ג (12 יח\')';
+const COARSE = 'מלח עבה 1 ק"ג (12 במארז)';
+
+// Coarse salt was received into the table-salt item (as an alias); split it into its own item.
+function splitCoarseSalt(state) {
+  const salt = state.items.find((i) => normName(i.name) === normName(SALT));
+  const hasAlias = salt && (salt.aliases || []).some((a) => normName(a) === normName(COARSE));
+  const alreadySeparate = state.items.some((i) => normName(i.name) === normName(COARSE));
+  if (!hasAlias || alreadySeparate) return state;
+  const delivered = state.orders.filter((o) => normName(o.name) === normName(COARSE));
+  const moved = round2(delivered.reduce((sum, o) => sum + o.qty, 0)) || 12;
+  const price = delivered.length ? delivered[delivered.length - 1].price : 1.5;
+  const lastSalt = state.orders.filter((o) => normName(o.name) === normName(SALT)).sort((a, b) => a.date.localeCompare(b.date)).pop();
+  const items = state.items.map((i) => (i !== salt ? i : {
+    ...i,
+    quantity: Math.max(0, round2((i.quantity ?? 0) - moved)),
+    aliases: (i.aliases || []).filter((a) => normName(a) !== normName(COARSE)),
+    ...(lastSalt ? { lastOrderQty: lastSalt.qty, lastOrderDate: lastSalt.date } : {}),
+  }));
+  items.push({
+    id: 'fix-split-coarse-salt-1', name: COARSE, category: salt.category, quantity: moved, unit: salt.unit, lowThreshold: 0, max: moved, expiry: '',
+    supplier: salt.supplier, price, lastOrderQty: moved, lastOrderDate: delivered.length ? delivered[delivered.length - 1].date : '2026-11-08',
+  });
+  return { ...state, items };
+}
+
+const FIXES = [{ id: 'fix-split-coarse-salt', run: splitCoarseSalt }];
+
 // state: { items, orders, applied } -> the same shape. Only inventories that descend from the original kitchen are touched.
 export function runMigrations(state) {
   if (!isLegacyState(state.items)) return state;
-  return RECEIPTS.filter((r) => !state.applied.includes(r.id)).reduce(receive, state);
+  const received = RECEIPTS.filter((r) => !state.applied.includes(r.id)).reduce(receive, state);
+  return FIXES.filter((f) => !received.applied.includes(f.id)).reduce((st, f) => ({ ...f.run(st), applied: [...st.applied, f.id] }), received);
 }
