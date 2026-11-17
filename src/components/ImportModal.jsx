@@ -45,10 +45,10 @@ export default function ImportModal({ items, orders, onClose, onApply }) {
     downloadBlob(blob, 'inventory-template.xlsx');
   };
 
-  const plan = parsed ? planImport(items, orders, parsed, { mode, includeOrders }) : null;
+  const plan = parsed ? planImport(items, orders, parsed, { mode: parsed.items.length ? mode : 'merge', includeOrders }) : null;
 
   const apply = () => {
-    if (mode === 'replace' && !window.confirm('זה ימחק את כל המוצרים הקיימים ויחליף אותם בקובץ. להמשיך?')) return;
+    if (parsed.items.length && mode === 'replace' && !window.confirm('זה ימחק את כל המוצרים הקיימים ויחליף אותם בקובץ. להמשיך?')) return;
     onApply(plan);
   };
 
@@ -95,14 +95,20 @@ export default function ImportModal({ items, orders, onClose, onApply }) {
             </ul>
 
             <div className="mb-3 space-y-2 text-sm">
-              <label className="flex items-start gap-2">
-                <input type="radio" name="mode" checked={mode === 'merge'} onChange={() => setMode('merge')} className="mt-1 accent-primary" />
-                <span><b>הוסף ועדכן</b> – מוצרים חדשים יתווספו, ומוצרים בעלי אותו שם יתעדכנו לפי הקובץ. שום מוצר לא יימחק.</span>
-              </label>
-              <label className="flex items-start gap-2">
-                <input type="radio" name="mode" checked={mode === 'replace'} onChange={() => setMode('replace')} className="mt-1 accent-primary" />
-                <span><b>החלף הכול</b> – המלאי הנוכחי יימחק ויוחלף במה שבקובץ.</span>
-              </label>
+              {parsed.items.length > 0 ? (
+                <>
+                  <label className="flex items-start gap-2">
+                    <input type="radio" name="mode" checked={mode === 'merge'} onChange={() => setMode('merge')} className="mt-1 accent-primary" />
+                    <span><b>הוסף ועדכן</b> – מוצרים חדשים יתווספו, ומוצרים בעלי אותו שם יתעדכנו לפי הקובץ. שום מוצר לא יימחק.</span>
+                  </label>
+                  <label className="flex items-start gap-2">
+                    <input type="radio" name="mode" checked={mode === 'replace'} onChange={() => setMode('replace')} className="mt-1 accent-primary" />
+                    <span><b>החלף הכול</b> – המלאי הנוכחי יימחק ויוחלף במה שבקובץ.</span>
+                  </label>
+                </>
+              ) : (
+                <p className="rounded-control bg-tint p-3 text-ink-2">הקובץ כולל רק הזמנות. הן יתווספו להיסטוריית ההזמנות והמלאי לא ישתנה. כדי להוסיף את הכמויות למלאי, פתח את ההזמנה בלשונית "היסטוריית הזמנות" ולחץ "קלוט למלאי".</p>
+              )}
               {parsed.orders.length > 0 && (
                 <label className="flex items-center gap-2">
                   <input type="checkbox" checked={includeOrders} onChange={(e) => setIncludeOrders(e.target.checked)} className="accent-primary" />

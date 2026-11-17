@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, History, Search, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, History, PackageCheck, Search, Trash2 } from 'lucide-react';
 import { daysUntil, formatDate, money, orderStats } from '../lib.js';
 
 function FrequencyTable({ stats, supplier, query }) {
@@ -49,7 +49,7 @@ function FrequencyTable({ stats, supplier, query }) {
   );
 }
 
-export default function OrdersHistory({ orders, onDeleteOrder }) {
+export default function OrdersHistory({ orders, onDeleteOrder, onReceive }) {
   const [supplier, setSupplier] = useState('all');
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState([]);
@@ -121,16 +121,21 @@ export default function OrdersHistory({ orders, onDeleteOrder }) {
             const isOpen = open.includes(g.key);
             return (
               <div key={g.key} className="overflow-hidden card">
-                <button onClick={() => toggle(g.key)} className="flex w-full items-center gap-3 p-4 text-right hover:bg-subtle">
-                  <div className="flex-1">
-                    <div className="font-bold">{g.supplier}</div>
-                    <div className="text-sm text-ink-3">
-                      {formatDate(g.date)}{g.invoice ? ` · חשבונית ${g.invoice}` : ''} · {g.rows.length} פריטים
+                <div className="flex flex-wrap items-center gap-2 pe-3 sm:flex-nowrap">
+                  <button onClick={() => toggle(g.key)} aria-expanded={isOpen} className="flex min-w-0 flex-1 basis-60 items-center gap-3 p-4 text-right hover:bg-subtle">
+                    <div className="flex-1">
+                      <div className="font-bold">{g.supplier}</div>
+                      <div className="text-sm text-ink-3">
+                        {formatDate(g.date)}{g.invoice ? ` · חשבונית ${g.invoice}` : ''} · {g.rows.length} פריטים
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-lg font-bold">{money(g.total)}</div>
-                  {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </button>
+                    <div className="text-lg font-bold">{money(g.total)}</div>
+                    {isOpen ? <ChevronUp size={18} aria-hidden="true" /> : <ChevronDown size={18} aria-hidden="true" />}
+                  </button>
+                  {g.rows.every((r) => r.received)
+                    ? <span className="badge bg-success-soft text-success-text">נקלט למלאי</span>
+                    : <button onClick={() => onReceive(g)} className="btn-secondary mb-2 sm:mb-0"><PackageCheck size={16} aria-hidden="true" /> קלוט למלאי</button>}
+                </div>
                 {isOpen && (
                   <table className="w-full border-t border-line text-sm">
                     <thead className="bg-subtle text-ink-3">

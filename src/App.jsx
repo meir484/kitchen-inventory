@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { catLabel, categoriesOf } from './data.js';
 import {
-  daysUntil, downloadBlob, EXPIRY_SOON_DAYS, load, money, needsOrder, normalizeState, orderStats, qtyOf, save, STATUS, stockStatus, stockValue, todayIso,
+  daysUntil, downloadBlob, EXPIRY_SOON_DAYS, load, money, needsOrder, normName, normalizeState, orderStats, qtyOf, save, STATUS, stockStatus, stockValue, todayIso,
 } from './lib.js';
 import {
   fetchDoc, isValidCode, loginAccount, lockEditing, newKitchenCode, registerAccount, resetPassword, saveDoc, watchAuth, watchDoc, withTimeout,
@@ -21,6 +21,8 @@ import Welcome from './components/Welcome.jsx';
 import UnlockModal from './components/UnlockModal.jsx';
 import OrderModal from './components/OrderModal.jsx';
 import OrdersHistory from './components/OrdersHistory.jsx';
+import ReceiveModal from './components/ReceiveModal.jsx';
+import { runMigrations } from './migrations.js';
 
 const ITEMS_KEY = 'kitchen-inventory:v2:items';
 const ORDERS_KEY = 'kitchen-inventory:v2:orders';
@@ -57,11 +59,12 @@ function StatCard({ icon: Icon, label, value, tone, muted = false }) {
 }
 
 export default function App() {
-  const [items, setItems] = useState(() => load(ITEMS_KEY, []));
-  // Ids of one-time updates applied by earlier versions; kept as is so that older open tabs never repeat them.
-  const [applied, setApplied] = useState(() => load(APPLIED_KEY, []));
+  // One-time stock updates (e.g. a delivery) are applied once to inventories of the original kitchen; the applied ids travel with the data.
+  const [boot] = useState(() => runMigrations({ items: load(ITEMS_KEY, []), orders: load(ORDERS_KEY, []), applied: load(APPLIED_KEY, []) }));
+  const [items, setItems] = useState(boot.items);
+  const [applied, setApplied] = useState(boot.applied);
   const [removedOrders, setRemovedOrders] = useState(() => load(REMOVED_KEY, []));
-  const [orders, setOrders] = useState(() => load(ORDERS_KEY, []));
+  const [orders, setOrders] = useState(boot.orders);
   const [checked, setChecked] = useState(() => load(CHECKED_KEY, []));
   const [tab, setTab] = useState('inventory');
   const [category, setCategory] = useState('all');
@@ -73,6 +76,7 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showCount, setShowCount] = useState(false);
+  const [receiving, setReceiving] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [showSync, setShowSync] = useState(false);
   const [showUnlock, setShowUnlock] = useState(false);
@@ -123,10 +127,11 @@ export default function App() {
   const applyRemote = (data) => {
     const next = normalizeState(JSON.parse(data.payload));
     lastRemote.current = data.payload;
-    setItems(next.items);
-    setApplied(next.appliedMigrations);
+    const migrated = runMigrations({ items: next.items, orders: next.orders, applied: next.appliedMigrations });
+    setItems(migrated.items);
+    setApplied(migrated.applied);
     setChecked(next.checked);
-    setOrders(next.orders);
+    setOrders(migrated.orders);
     setRemovedOrders(next.removedOrders);
   };
 
@@ -282,6 +287,40 @@ export default function App() {
     setOrders((p) => [...p, ...rows]);
     setShowOrder(false);
     setTab('history');
+  });
+  // Adds an order's quantities to the stock. Each decision: { row, action: 'item' | 'new', itemId, qty }.
+  const receiveOrder = guard((decisions, rowIds) => {
+    const stamp = Date.now();
+    setItems((prev) => {
+      let next = [...prev];
+      decisions.forEach((d, k) => {
+        if (d.action === 'item') {
+          next = next.map((i) => {
+            if (i.id !== d.itemId) return i;
+            const quantity = Math.round(((i.quantity ?? 0) + d.qty) * 100) / 100;
+            const known = new Set([normName(i.name), ...(i.aliases || []).map(normName)]);
+            return {
+              ...i,
+              quantity,
+              max: Math.max(i.max || 1, quantity),
+              lastOrderQty: d.row.qty,
+              lastOrderDate: d.row.date,
+              aliases: known.has(normName(d.row.name)) ? i.aliases : [...(i.aliases || []), d.row.name],
+              ...(!i.supplier && d.row.supplier ? { supplier: d.row.supplier } : {}),
+              ...(i.price == null && d.row.price ? { price: d.row.price } : {}),
+            };
+          });
+        } else {
+          next.push({
+            id: `n-${stamp}-${k}`, name: d.row.name, category: 'כללי', quantity: d.qty, unit: 'יח׳', lowThreshold: 0, max: Math.max(d.qty, 1), expiry: '',
+            supplier: d.row.supplier === 'ללא ספק' ? '' : d.row.supplier, price: d.row.price || null, lastOrderQty: d.row.qty, lastOrderDate: d.row.date,
+          });
+        }
+      });
+      return next;
+    });
+    setOrders((prev) => prev.map((o) => (rowIds.includes(o.id) ? { ...o, received: true } : o)));
+    setReceiving(null);
   });
   const deleteOrderRow = guard((id) => {
     if (window.confirm('למחוק את שורת ההזמנה?')) {
@@ -592,7 +631,7 @@ export default function App() {
         </section>
       )}
 
-      {tab === 'history' && <OrdersHistory orders={orders} onDeleteOrder={deleteOrderRow} />}
+      {tab === 'history' && <OrdersHistory orders={orders} onDeleteOrder={deleteOrderRow} onReceive={guard((g) => setReceiving(g))} />}
 
       {showSync && (
         <SyncModal code={code} status={syncStatus} accountUser={accountUser} onMoveToAccount={moveToAccount} accountsEnabled={ACCOUNTS_ENABLED}
@@ -611,6 +650,7 @@ export default function App() {
           onDelete={(id) => { setEditingId(null); remove(id); }}
         />
       )}
+      {receiving && <ReceiveModal group={receiving} items={items} onClose={() => setReceiving(null)} onApply={receiveOrder} />}
       {showCount && <CountSheetModal items={items} categories={categories} onClose={() => setShowCount(false)} />}
       {showImport && <ImportModal items={items} orders={orders} onClose={() => setShowImport(false)} onApply={applyImport} />}
       {showAdd && <AddModal categories={categories} onClose={() => setShowAdd(false)} onSave={add} />}

@@ -148,3 +148,33 @@ export function printHtml(html) {
   frame.srcdoc = html;
   document.body.appendChild(frame);
 }
+
+// ---- Matching an order/invoice line to an inventory item ----
+export const normName = (s) =>
+  String(s ?? '').toLowerCase().replace(/["'׳״`’]/g, '').replace(/[()\-–.,/]/g, ' ').replace(/\s+/g, ' ').trim();
+
+const NOISE = new Set(['בדץ', 'יח', 'יחידה', 'במארז']);
+const wordsOf = (s) => normName(s).split(' ').filter(Boolean);
+
+// How alike two names are. Numbers (sizes) must agree, so "שמן 1 ליטר" never matches "שמן 5 ליטר".
+export function nameSimilarity(a, b) {
+  const wa = wordsOf(a); const wb = wordsOf(b);
+  const numsA = wa.filter((w) => /^\d+$/.test(w)); const numsB = wb.filter((w) => /^\d+$/.test(w));
+  if (numsA.length && numsB.length && [...numsA].sort().join() !== [...numsB].sort().join()) return 0;
+  const ta = new Set(wa.filter((w) => !/^\d+$/.test(w) && !NOISE.has(w))); const tb = new Set(wb.filter((w) => !/^\d+$/.test(w) && !NOISE.has(w)));
+  if (!ta.size || !tb.size) return 0;
+  const inter = [...ta].filter((w) => tb.has(w)).length;
+  return inter / (ta.size + tb.size - inter);
+}
+
+// -> { item, kind: 'exact' | 'alias' | 'close' } or null.  Items remember the invoice names they were matched with (`aliases`).
+export function matchItem(items, name) {
+  const n = normName(name);
+  const alias = items.find((i) => (i.aliases || []).some((a) => normName(a) === n));
+  if (alias) return { item: alias, kind: 'alias' };
+  const exact = items.find((i) => normName(i.name) === n);
+  if (exact) return { item: exact, kind: 'exact' };
+  let best = null;
+  items.forEach((i) => { const score = nameSimilarity(i.name, name); if (score >= 0.7 && (!best || score > best.score)) best = { item: i, kind: 'close', score }; });
+  return best;
+}
