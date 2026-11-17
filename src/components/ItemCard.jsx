@@ -48,7 +48,7 @@ function ItemMenu({ item, onEdit, onToggleMute, onDelete }) {
   );
 }
 
-export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMute, onSetQty, onEdit, onSetMin }) {
+export default function ItemCard({ item, alias, rhythm, onAdjust, onDelete, onToggleMute, onSetQty, onEdit, onSetMin }) {
   const status = stockStatus(item);
   const s = STATUS[status];
   const cat = catLabel(item.category);
@@ -83,6 +83,7 @@ export default function ItemCard({ item, rhythm, onAdjust, onDelete, onToggleMut
 
       <h3 className="t-product">
         <button onClick={() => onEdit(item.id)} title={item.name} className="line-clamp-2 min-h-11 w-full break-words text-right hover:text-primary">{item.name}</button>
+        {alias && <div className="mt-0.5 text-xs text-muted">נמצא לפי שם בחשבונית: {alias}</div>}
       </h3>
 
       <div className="h-1 overflow-hidden rounded-full bg-tint" role="presentation">

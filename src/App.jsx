@@ -6,6 +6,7 @@ import {
 import { catLabel, categoriesOf } from './data.js';
 import {
   daysUntil, downloadBlob, EXPIRY_SOON_DAYS, load, money, needsOrder, normName, normalizeState, orderStats, qtyOf, save, STATUS, stockStatus, stockValue, todayIso,
+  aliasHit, matchesQuery,
 } from './lib.js';
 import {
   fetchDoc, isValidCode, loginAccount, lockEditing, newKitchenCode, registerAccount, resetPassword, saveDoc, watchAuth, watchDoc, withTimeout,
@@ -354,7 +355,7 @@ export default function App() {
 
   const visible = useMemo(() => {
     const q = query.trim();
-    const list = items.filter((i) => (category === 'all' || i.category === category) && (!onlyMuted || i.muted) && i.name.includes(q));
+    const list = items.filter((i) => (category === 'all' || i.category === category) && (!onlyMuted || i.muted) && matchesQuery(i, q));
     const far = Number.MAX_SAFE_INTEGER;
     const sorters = {
       name: (a, b) => a.name.localeCompare(b.name, 'he'),
@@ -395,7 +396,7 @@ export default function App() {
 
   const grid = (list) => (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {list.map((i) => <ItemCard key={i.id} item={i} rhythm={rhythms.get(i.name)} onAdjust={adjust} onDelete={remove} onToggleMute={toggleMute} onSetQty={setQty} onEdit={(id) => (readOnly ? setShowUnlock(true) : setEditingId(id))} onSetMin={setMin} />)}
+      {list.map((i) => <ItemCard key={i.id} item={i} alias={aliasHit(i, query)} rhythm={rhythms.get(i.name)} onAdjust={adjust} onDelete={remove} onToggleMute={toggleMute} onSetQty={setQty} onEdit={(id) => (readOnly ? setShowUnlock(true) : setEditingId(id))} onSetMin={setMin} />)}
     </div>
   );
 

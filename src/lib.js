@@ -178,3 +178,14 @@ export function matchItem(items, name) {
   items.forEach((i) => { const score = nameSimilarity(i.name, name); if (score >= 0.7 && (!best || score > best.score)) best = { item: i, kind: 'close', score }; });
   return best;
 }
+
+// Search by the item's name or by any invoice name it was matched with (`aliases`).
+export const matchesQuery = (item, query) => {
+  const q = normName(query);
+  return !q || [item.name, ...(item.aliases || [])].some((n) => normName(n).includes(q));
+};
+export const aliasHit = (item, query) => {
+  const q = normName(query);
+  if (!q || normName(item.name).includes(q)) return null;
+  return (item.aliases || []).find((a) => normName(a).includes(q)) || null;
+};
